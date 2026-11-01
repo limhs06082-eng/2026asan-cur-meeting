@@ -35,6 +35,7 @@ export function Checks() {
             <li key={i}>
               <span className="pill">{q.kind}</span> {q.text}
               <button className="btn tiny ghost" onClick={() => (q.targetType === 'card' ? app.selectCard(q.targetId) : app.selectConnection(q.targetId))}>열기</button>
+              {q.suggest && app.perm.canWrite ? <button className="btn tiny" onClick={() => app.openConnectionEditor({ fromCardId: q.suggest!.from, toCardId: q.suggest!.to })}>연결 양식 열기</button> : null}
             </li>
           ))}
         </ul>

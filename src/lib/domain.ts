@@ -351,7 +351,11 @@ export interface CheckQuestion {
   targetType: 'card' | 'connection';
   targetId: string;
   grade: number;
+  suggest?: { from: string; to: string }; // 연결 양식을 미리 채울 때만 사용(자동 등록하지 않음)
 }
+
+/** 원본 표에서 학년 사이에 화살표(⇨)로 이어 그린 행 */
+export const SOURCE_FLOW_CATEGORIES = ['expansion', 'instrument', 'info', 'autonomy'];
 
 /**
  * 구조를 바탕으로 한 점검 질문. 판단이 아니라 '확인해 볼 질문'이며
@@ -375,6 +379,18 @@ export function checkQuestions(idx: Index): CheckQuestion[] {
   for (const d of duplicateCandidates(idx)) {
     q.push({ kind: '중복으로 보이는 활동', text: `${gradeLabel(d.a.grade)} ‘${d.a.title}’ 과 ‘${d.b.title}’: 같은 활동인지 별도 활동인지 확인해 주세요. (${d.why})`, targetType: 'card', targetId: d.a.id, grade: d.a.grade });
   }
+  // 원본 표의 화살표 흐름: 인접 학년 카드 사이에 아직 연결이 없으면 '검토해 볼 질문'으로만 보인다
+  const live = Array.from(idx.cards.values()).filter(isLive);
+  for (const cat of SOURCE_FLOW_CATEGORIES) {
+    const inRow = (g: number) => live.filter((c) => c.grade === g && c.sourceOccurrences.some((s) => s.category === cat));
+    for (let g = 1; g < 6; g++) {
+      for (const a of inRow(g)) for (const b of inRow(g + 1)) {
+        const linked = idx.connections.some((c) => !c.deletedAt && ((c.fromCardId === a.id && c.toCardId === b.id) || (c.fromCardId === b.id && c.toCardId === a.id)));
+        if (!linked) q.push({ kind: '원본 화살표 흐름', text: `원본 표에 ‘${a.title}’(${g}학년) ⇨ ‘${b.title}’(${g + 1}학년) 흐름이 있습니다. 무엇이 이어지고 깊어지는지 연결로 기록할지 검토해 보세요.`, targetType: 'card', targetId: a.id, grade: g, suggest: { from: a.id, to: b.id } });
+      }
+    }
+  }
+
   // 목적이 빈 카드는 학년별 한 줄로 묶는다(질문 목록이 넘치지 않게)
   const noPurpose = new Map<number, Card[]>();
   for (const c of idx.cards.values()) {

@@ -187,3 +187,16 @@ describe('충돌 병합 (A03)', () => {
     expect(r.conflicts).toEqual(['topics']);
   });
 });
+
+describe('원본 화살표 흐름 질문', () => {
+  it('원본 화살표 행의 인접 학년 카드는 질문으로만 제안되고, 연결하면 질문이 사라진다', () => {
+    const src = (cat: string) => [{ sourceId: 's', category: cat, categoryLabel: cat, gradeCell: '', text: '', order: 1 }];
+    const a = card('a', 1, { sourceOccurrences: src('instrument') });
+    const b = card('b', 2, { sourceOccurrences: src('instrument') });
+    const q1 = checkQuestions(idxOf({ cards: [a, b] })).filter((q) => q.kind === '원본 화살표 흐름');
+    expect(q1).toHaveLength(1);
+    expect(q1[0].suggest).toEqual({ from: 'a', to: 'b' });
+    const q2 = checkQuestions(idxOf({ cards: [a, b], connections: [conn('a', 'b', 1, 2)] })).filter((q) => q.kind === '원본 화살표 흐름');
+    expect(q2).toHaveLength(0);
+  });
+});
