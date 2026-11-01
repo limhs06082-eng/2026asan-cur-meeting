@@ -15,7 +15,7 @@ interface Snap { at: Date; year: YearDoc; idx: Index; cards: Card[]; proposals: 
 export function Output() {
   const app = useApp();
   const y = useYear();
-  const [mode, setMode] = useState<'a3' | 'a4' | 'notes'>('a3');
+  const [mode, setMode] = useState<'a3' | 'a4' | 'notes' | 'cards'>('a3');
   const [usePurpose, setUsePurpose] = useState(true);
   const [useFilter, setUseFilter] = useState(false);
   const [snap, setSnap] = useState<Snap | null>(null);
@@ -57,6 +57,7 @@ export function Output() {
           <label className="check"><input type="radio" checked={mode === 'a3'} onChange={() => setMode('a3')} /> 한눈에 보기 (A3 가로 1장)</label>
           <label className="check"><input type="radio" checked={mode === 'a4'} onChange={() => setMode('a4')} /> 한눈에 보기 (A4 분할: 1~3 / 4~6학년)</label>
           <label className="check"><input type="radio" checked={mode === 'notes'} onChange={() => setMode('notes')} /> 연결 설명·변경 기록·미해결 목록 (A4)</label>
+          <label className="check"><input type="radio" checked={mode === 'cards'} onChange={() => setMode('cards')} /> 학년별 카드 목록 (A4, 종이 검토용)</label>
         </div>
         <div className="row-wrap">
           <label className="check"><input type="checkbox" checked={usePurpose} onChange={(e) => setUsePurpose(e.target.checked)} /> 짧은 목적 함께 표시</label>
@@ -68,7 +69,7 @@ export function Output() {
         <p className="muted small">출력은 만든 시점의 읽기 전용 스냅샷입니다. 브라우저 인쇄 창에서 ‘PDF로 저장’을 고르면 PDF 파일이 됩니다(용지: A3 가로 또는 A4, 배율 ‘기본’, 배경 그래픽 켬 권장). 직접 PDF 내려받기는 한글 글꼴 검증 전이라 제공하지 않습니다.</p>
         {y.year && y.year.status !== 'final' ? <p className="muted small">이 작업본은 확정 전이라 모든 출력에 ‘협의 중 초안’이 표시됩니다. 최종 출력은 확정본에서 만드세요.</p> : null}
       </div>
-      {snap ? (mode === 'notes' ? <Notes s={snap} /> : <Glance s={snap} split={mode === 'a4'} usePurpose={usePurpose} />) : <p className="muted no-print">‘출력 화면 만들기’를 누르면 미리보기가 나옵니다.</p>}
+      {snap ? (mode === 'notes' ? <Notes s={snap} /> : mode === 'cards' ? <CardList s={snap} /> : <Glance s={snap} split={mode === 'a4'} usePurpose={usePurpose} />) : <p className="muted no-print">‘출력 화면 만들기’를 누르면 미리보기가 나옵니다.</p>}
     </div>
   );
 }
@@ -150,6 +151,40 @@ function Glance({ s, split, usePurpose }: { s: Snap; split: boolean; usePurpose:
           <Header s={s} title={`${title} (${h[0]}~${h[h.length - 1]}학년, ${i + 1}/${halves.length})`} />
           <GlanceTable s={s} grades={h} usePurpose={usePurpose} cats={cats} />
           {legend}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** 학년별 카드 목록: 회의 전에 종이로 사실을 검토할 때 쓴다(학년마다 새 쪽). */
+function CardList({ s }: { s: Snap }) {
+  const catName = (id: string) => s.year.categories.find((c) => c.id === id)?.name || id;
+  const live = s.cards.filter(isLive).sort(compareCards);
+  const grades = [0, ...s.scopeGrades].filter((g) => live.some((c) => c.grade === g));
+  return (
+    <>
+      {grades.map((g) => (
+        <div key={g} className="print-a4 sheet notes">
+          <Header s={s} title={`${gradeLabel(g)} 활동 카드 목록`} />
+          <table className="simple print-table">
+            <thead><tr><th style={{ width: '22%' }}>활동</th><th>배움의 목적</th><th style={{ width: '13%' }}>대표 영역</th><th style={{ width: '10%' }}>사실 확인</th><th style={{ width: '18%' }}>확인할 점·메모</th></tr></thead>
+            <tbody>
+              {live.filter((c) => c.grade === g).map((c) => {
+                const k = s.idx.checks.get(c.id);
+                const ok = !!k && !k.revokedAt && k.contentVersion === c.contentVersion;
+                return (
+                  <tr key={c.id}>
+                    <td><strong>{c.title}</strong>{c.changeType ? ` (${CHANGE_LABEL[c.changeType]})` : ''}</td>
+                    <td>{c.learningPurpose || '□ (비어 있음)'}</td>
+                    <td>{catName(c.primaryCategory)}</td>
+                    <td>{g === 0 ? '-' : ok ? '✓' : '□'}</td>
+                    <td className="small">{c.checkFlags.join(' / ')}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ))}
     </>

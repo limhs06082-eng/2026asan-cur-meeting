@@ -3,6 +3,8 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 const LS_COMMON = 'asan.commonOpen';
 const readOpen = () => { try { return localStorage.getItem(LS_COMMON) !== '0'; } catch { return true; } };
+const LS_TIP = 'asan.tipClosed';
+const readTip = () => { try { return localStorage.getItem(LS_TIP) === '1'; } catch { return false; } };
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { CardChip } from '../components/CardChip';
@@ -19,6 +21,9 @@ export function Board() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [commonOpen, setCommonOpen] = useState(readOpen);
+  const [topicLines, setTopicLines] = useState(false);
+  const [big, setBig] = useState(false);
+  const [tipClosed, setTipClosed] = useState(readTip);
   const toggleCommon = () => { const v = !commonOpen; setCommonOpen(v); try { localStorage.setItem(LS_COMMON, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
 
   const shown = useMemo(() => applyFilters(cards, f, idx), [cards, f, idx]);
@@ -31,13 +36,23 @@ export function Board() {
   }, [year, cards]);
   const catName = useMemo(() => new Map(cats.map((c) => [c.id, c.name])), [cats]);
   const grades = f.grades.length ? f.grades : GRADES;
+  // 검색·주제·상태 등으로 좁혀 볼 때는 빈 행과 추가 칸을 숨겨 화면을 정리한다
+  const narrowed = !!(f.search || f.topic || f.state || f.change || f.category);
 
   // 선택한 카드의 연결(주제 필터가 있으면 해당 주제만)
   const related = useMemo(() => {
-    if (!selectedCardId) return { ids: new Set<string>(), conns: [] as Connection[] };
+    if (!selectedCardId) {
+      // 카드를 고르지 않았을 때는 '주제 연결선 보기'를 켠 경우에만 그 주제의 연결을 그린다
+      if (topicLines && f.topic) {
+        const visible = new Set(shown.map((x) => x.card.id));
+        const conns = connections.filter((c) => !c.deletedAt && c.topicId === f.topic && visible.has(c.fromCardId) && visible.has(c.toCardId));
+        return { ids: new Set<string>(), conns };
+      }
+      return { ids: new Set<string>(), conns: [] as Connection[] };
+    }
     const conns = connections.filter((c) => !c.deletedAt && (c.fromCardId === selectedCardId || c.toCardId === selectedCardId) && (!f.topic || c.topicId === f.topic));
     return { ids: new Set(conns.flatMap((c) => [c.fromCardId, c.toCardId])), conns };
-  }, [selectedCardId, connections, f.topic]);
+  }, [selectedCardId, connections, f.topic, topicLines, shown]);
 
   const onCardClick = useCallback((c: Card) => {
     if (connectFrom) {
@@ -51,7 +66,7 @@ export function Board() {
 
   const measure = useCallback(() => {
     const wrap = wrapRef.current;
-    if (!wrap || !selectedCardId || related.conns.length === 0) { setLines([]); return; }
+    if (!wrap || related.conns.length === 0) { setLines([]); return; }
     const base = wrap.getBoundingClientRect();
     const pos = (id: string) => {
       const el = wrap.querySelector<HTMLElement>(`[data-card="${CSS.escape(id)}"]`);
@@ -67,7 +82,7 @@ export function Board() {
       out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, conn: c, agreed: connectionState(c, idx).state === 'agreed', dir: !CONNECTION_TYPES[c.type].symmetric });
     }
     setLines(out);
-  }, [selectedCardId, related, idx]);
+  }, [related, idx]);
 
   useLayoutEffect(() => {
     measure();
@@ -106,8 +121,20 @@ export function Board() {
   const canAdd = (g: number) => app.perm.canEditGrade(g);
 
   return (
-    <div className="board-page">
+    <div className={`board-page ${big ? 'big' : ''}`}>
+      {!tipClosed && app.perm.canWrite ? (
+        <div className="tip" role="note">
+          처음이라면: <strong>‘내 학년만’</strong> → 카드 누르기 → <strong>카드 수정</strong>(배움의 목적 쓰기) → <strong>실제 운영과 맞음 — 확인</strong> → 이어지는 카드와 <strong>연결 만들기</strong>. 자세한 내용은 ‘사용 안내’.
+          <button className="btn tiny ghost" onClick={() => { setTipClosed(true); try { localStorage.setItem(LS_TIP, '1'); } catch { /* 저장 불가 */ } }} aria-label="안내 닫기">닫기</button>
+        </div>
+      ) : null}
       <FilterBar count={shown.length} />
+      <div className="row-wrap board-tools">
+        <button className="btn tiny" aria-pressed={big} onClick={() => setBig(!big)} title="전자칠판·화면 공유용으로 글자를 크게 봅니다(내 화면에만 적용)">{big ? '보통 크기' : '크게 보기'}</button>
+      </div>
+      {f.topic ? (
+        <label className="check topic-lines"><input type="checkbox" checked={topicLines} onChange={(e) => setTopicLines(e.target.checked)} /> ‘{f.topic}’ 주제의 연결선 보기 {topicLines && !selectedCardId ? `(${related.conns.length}개)` : ''}</label>
+      ) : null}
       {connectFrom ? (
         <div className="connect-banner" role="status">
           연결 만들기: <strong>{idx.cards.get(connectFrom)?.title}</strong> 에서 시작합니다. 도착 카드를 누르세요. (같은 카드를 다시 누르거나 Esc로 취소)
@@ -137,7 +164,8 @@ export function Board() {
             </tr>
           </thead>
           <tbody>
-            {cats.filter((c) => c.id !== 'common' || grades.some((g) => byCell.has(`common|${g}`))).filter((c) => !f.category || c.id === f.category).map((cat) => (
+            {cats.filter((c) => c.id !== 'common' || grades.some((g) => byCell.has(`common|${g}`))).filter((c) => !f.category || c.id === f.category)
+              .filter((c) => !narrowed || grades.some((g) => byCell.has(`${c.id}|${g}`) || refs.has(`${c.id}|${g}`))).map((cat) => (
               <tr key={cat.id}>
                 <th scope="row" className="rowhead">{cat.name}</th>
                 {grades.map((g) => {
@@ -151,7 +179,7 @@ export function Board() {
                           ↪ {c.title}
                         </button>
                       ))}
-                      {canAdd(g) && list.length === 0 ? <button className="cell-add" onClick={() => app.openCardEditor({ grade: g, category: cat.id })} aria-label={`${g}학년 ${cat.name}에 카드 추가`}>+</button> : null}
+                      {canAdd(g) && list.length === 0 && !narrowed ? <button className="cell-add" onClick={() => app.openCardEditor({ grade: g, category: cat.id })} aria-label={`${g}학년 ${cat.name}에 카드 추가`}>+</button> : null}
                     </td>
                   );
                 })}
