@@ -56,6 +56,18 @@ const OP_LABEL: Record<string, string> = {
 };
 export const opLabel = (op: string) => OP_LABEL[op] || op;
 
+// 이력에 보이는 항목 이름(구현 용어 대신 화면 용어)
+const KEY_LABEL: Record<string, string> = {
+  title: '활동명', learningPurpose: '배움의 목적', primaryCategory: '대표 영역', categories: '영역 태그', focusTags: '배움·자람·나눔', topics: '주제',
+  planningDetails: '운영 정보', changeType: '변경 유형', changeReason: '변경 이유', addReason: '추가 이유', checkFlags: '확인 메모', commonGroupId: '공통 묶음', grade: '학년',
+  type: '연결 종류', from: '시작 카드', to: '도착 카드', topicId: '주제', reason: '연결 이유', inheritedLearning: '이어받을 배움', deepenedLearning: '깊어지는 배움',
+  skipReason: '건너뛰는 이유', rolesByGrade: '학년별 역할', sharedResult: '함께 확인할 결과', commonGoal: '공통 목표', gradeScope: '학년별 운영 범위',
+  decision: '판단', status: '상태', kind: '제안 종류', targetId: '대상', mergedFrom: '합쳐진 카드', mergedInto: '합친 곳', appliedCardVersion: '반영된 카드 버전',
+  appliedCardId: '새 카드', cardId: '카드', cards: '카드 수', deleteReason: '제외 이유', categoriesConfig: '영역',
+};
+const keyLabel = (k: string) => KEY_LABEL[k] || k;
+const isEmpty = (v: unknown) => v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0) || (typeof v === 'object' && !Array.isArray(v) && Object.values(v as object).every((x) => !x));
+
 function short(v: unknown): string {
   if (v === null || v === undefined) return '(없음)';
   if (typeof v === 'string') return v.length > 80 ? v.slice(0, 80) + '…' : v || '(빈칸)';
@@ -64,8 +76,26 @@ function short(v: unknown): string {
   return String(v);
 }
 
+const ENUM: Record<string, Record<string, string>> = {
+  changeType: { keep: '유지', modify: '수정', add: '추가', end: '종료' },
+  type: { deepen: '배움의 심화', joint: '학년 간 공동활동', common: '공통 운영' },
+  decision: { independent: '독립 운영', needsCheck: '추가 확인' },
+  status: { discussing: '논의 중', accepted: '수용', held: '보류', rejected: '반려', editing: '편집 중', final: '확정본', preparing: '준비 중' },
+  kind: { add: '활동 추가', modify: '활동 수정', merge: '활동 통합', independent: '독립 운영', end: '활동 종료', other: '기타' },
+};
+const CARD_REF_KEYS = ['from', 'to', 'cardId', 'mergedFrom', 'mergedInto', 'appliedCardId', 'targetId'];
+
 export function History({ targetIds, onRevert }: { targetIds: string[]; onRevert?: (e: EventDoc) => void }) {
-  const { yearId } = useYear();
+  const { yearId, year, idx } = useYear();
+  const catName = (id: string) => year?.categories.find((c) => c.id === id)?.name || id;
+  const fmt = (k: string, v: unknown): string => {
+    if (ENUM[k] && typeof v === 'string') return ENUM[k][v] || v;
+    if (k === 'primaryCategory' && typeof v === 'string') return catName(v);
+    if (k === 'categories' && Array.isArray(v)) return v.map((x) => catName(String(x))).join(', ') || '(없음)';
+    if (CARD_REF_KEYS.includes(k) && typeof v === 'string') return idx.cards.get(v)?.title || v;
+    if (k === 'grade' && typeof v === 'number') return v === 0 ? '학교 공통' : `${v}학년`;
+    return short(v);
+  };
   const [list, setList] = useState<EventDoc[] | null>(null);
   const [err, setErr] = useState('');
   const load = async () => {
@@ -94,8 +124,8 @@ export function History({ targetIds, onRevert }: { targetIds: string[]; onRevert
               <div><strong>{opLabel(e.op)}</strong> · {e.actorName} · <span className="muted">{fmtTime(e.at)}</span>{e.resultingVersion ? <span className="muted"> · 버전 {e.baseVersion ?? '-'}→{e.resultingVersion}</span> : null}</div>
               {e.after && Object.keys(e.after).length ? (
                 <div className="diff">
-                  {Object.keys(e.after).map((k) => (
-                    <div key={k}><code>{k}</code>: {e.before && k in e.before ? <><del>{short(e.before[k])}</del> → </> : null}<ins>{short(e.after![k])}</ins></div>
+                  {Object.keys(e.after).filter((k) => !(isEmpty(e.after![k]) && !(e.before && k in e.before))).map((k) => (
+                    <div key={k}><strong>{keyLabel(k)}</strong>: {e.before && k in e.before ? <><del>{fmt(k, e.before[k])}</del> → </> : null}<ins>{fmt(k, e.after![k])}</ins></div>
                   ))}
                 </div>
               ) : null}

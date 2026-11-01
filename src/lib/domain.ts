@@ -335,7 +335,8 @@ export function duplicateCandidates(idx: Index): DupCandidate[] {
         else if (ca.length >= 3 && cb.length >= 3 && (ca.includes(cb) || cb.includes(ca))) why = '한 활동명이 다른 활동명을 포함';
         else if (isTokenOf(a.title, b.title) || isTokenOf(b.title, a.title)) why = '한 활동명이 다른 활동명 안의 낱말과 같음';
         else if (similarity(ca, cb) >= 0.5) why = '활동명이 비슷함';
-        if (why) out.push({ a, b, why: `${why} · 영역: ${a.primaryCategory} / ${b.primaryCategory}`, key });
+        const where = (c: Card) => c.sourceOccurrences[0]?.categoryLabel || '';
+        if (why) out.push({ a, b, why: where(a) && where(b) ? `${why} · 원본 영역: ${where(a)} / ${where(b)}` : why, key });
       }
     }
   }
@@ -384,7 +385,7 @@ export function checkQuestions(idx: Index): CheckQuestion[] {
   for (const [g, list] of [...noPurpose.entries()].sort((a, b) => a[0] - b[0])) {
     q.push({ kind: '배움의 목적 비어 있음', text: `${gradeLabel(g)} 카드 ${list.length}개의 배움의 목적이 비어 있습니다(학년 확인 전에 채워야 함). 예: ${list.slice(0, 3).map((c) => `‘${c.title}’`).join(', ')}${list.length > 3 ? ' 등' : ''}`, targetType: 'card', targetId: list[0].id, grade: g });
   }
-  return q;
+  return q.sort((x, y) => x.grade - y.grade);
 }
 
 // ───────────────────────── 연도 확정 전 미해결 ─────────────────────────
