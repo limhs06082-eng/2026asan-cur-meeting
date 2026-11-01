@@ -150,6 +150,7 @@ code { font-size: 0.85em; background: var(--gray-soft); padding: 1px 4px; border
 .st-unchecked { background: var(--gray-soft); color: var(--muted); }
 .st-needs { background: var(--warn-soft); color: var(--warn); border-color: #f3d19c; }
 .st-prop { background: #e6f0fb; color: var(--blue); }
+.st-conn { background: #f1f5f9; color: #334155; border-color: #d6dee8; }
 .st-excluded { background: #eee; color: #555; }
 .ch-keep { background: #eef2f7; color: #3d4a5c; }
 .ch-modify { background: #e6f0fb; color: var(--blue); }

@@ -42,6 +42,7 @@ function CardChipInner({ card, st, catName, selected, related, dimmed, connectMo
         <StatusBadge st={st} compact />
         {card.grade === 0 ? null : st.checked ? <span className="badge st-checked" title="학년 사실 확인 완료(현재 버전)">✓ 확인</span> : <span className="badge st-unchecked" title="학년 미확인">미확인</span>}
         {st.needsCheck ? <span className="badge st-needs" title="추가 확인 필요">⚠ 확인</span> : null}
+        {st.liveConnections > 0 ? <span className="badge st-conn" title={`연결 ${st.liveConnections}개 중 합의 ${st.agreedConnections}개 (${st.scope === 'topic' ? '현재 주제 기준' : '전체 기준'})`}>연결 {st.agreedConnections}/{st.liveConnections}</span> : null}
         {st.openProposals > 0 ? <span className="badge st-prop" title="논의 중 제안">제안 {st.openProposals}</span> : null}
         {card.changeType && card.changeType !== 'keep' ? <span className={`badge ch-${card.changeType}`}>{CHANGE_LABEL[card.changeType]}</span> : null}
         {card.focusTags.map((t) => <span key={t} className={`tag tag-${t}`} title={`${t} (원본 표시)`}>{t[0]}</span>)}
