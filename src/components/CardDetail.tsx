@@ -123,6 +123,10 @@ export function CardDetail({ card }: { card: Card }) {
             return (
               <div key={d.key} className="dup-row">
                 <button className="link" onClick={() => app.selectCard(other.id)}>{other.title}</button> <span className="muted small">{d.why}</span>
+                <div className="muted small">
+                  이 카드: {card.sourceOccurrences.map((s) => `${s.categoryLabel}·${s.gradeCell}`).join(', ') || '교사 추가'}{card.planningDetails?.period ? ` · 시기 ${card.planningDetails.period}` : ''}
+                  {' / '}비교 카드: {other.sourceOccurrences.map((s) => `${s.categoryLabel}·${s.gradeCell}`).join(', ') || '교사 추가'}{other.planningDetails?.period ? ` · 시기 ${other.planningDetails.period}` : ''}
+                </div>
                 {canEdit ? <span className="row-wrap">
                   <button className="btn tiny" onClick={() => setDialog({ distinct: other })}>별도 활동임</button>
                   <button className="btn tiny" onClick={() => setDialog({ merge: other })}>이 카드로 합치기</button>

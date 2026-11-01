@@ -8,7 +8,7 @@ import {
   seedYear, setYearStatus, finalizeYear, cloneYear, exportBackup, importBackup, validateBackup, saveMember, updateYearConfig,
 } from '../lib/repo';
 import { buildSeedCards, seedSummary, seedFile } from '../seed/buildSeed';
-import { GRADES, gradeLabel, unresolvedSummary } from '../lib/domain';
+import { GRADES, gradeLabel, unresolvedSummary, connectionState } from '../lib/domain';
 import type { AccessRequest, Category, Job, Member, Role, YearDoc } from '../lib/types';
 import { Modal, useToast } from '../components/ui';
 import { roleSummary } from '../lib/perm';
@@ -172,6 +172,9 @@ function FinalizeDialog({ yr, onClose }: { yr: YearDoc; onClose: () => void }) {
             <li>논의 중 제안: {un.discussing.length}건 · 보류: {un.held.length}건</li>
           </ul>
           {un.uncheckedCards.length ? <details><summary>미확인 카드 목록</summary><ul className="plain">{un.uncheckedCards.map((c) => <li key={c.id}>{gradeLabel(c.grade)} {c.title}</li>)}</ul></details> : null}
+          {un.openConnections.length ? <details><summary>합의 전 연결 목록</summary><ul className="plain">{un.openConnections.map((c) => { const f = y.idx.cards.get(c.fromCardId); const t = y.idx.cards.get(c.toCardId); return <li key={c.id}>{f ? `${gradeLabel(f.grade)} ${f.title}` : '?'} → {t ? `${gradeLabel(t.grade)} ${t.title}` : '?'} <span className="muted small">({connectionState(c, y.idx).needGrades.map(gradeLabel).join('·')} 확인 필요)</span></li>; })}</ul></details> : null}
+          {un.needsCheck.length ? <details><summary>추가 확인 판단 목록</summary><ul className="plain">{un.needsCheck.map((r) => <li key={r.id}>{y.idx.cards.get(r.cardId)?.title} — {r.topicId || '전체'}: {r.reason}</li>)}</ul></details> : null}
+          {un.held.length + un.discussing.length ? <details><summary>보류·논의 중 제안 목록</summary><ul className="plain">{[...un.held, ...un.discussing].map((p) => <li key={p.id}>[{p.status === 'held' ? '보류' : '논의 중'}] {p.title}{p.handover ? ' · 다음 학년도 전달' : ''}</li>)}</ul></details> : null}
           <p className="muted small">모든 카드를 연결할 필요는 없습니다. 남은 협의 사항은 미해결 목록으로 확정본에 함께 보존되며, 미해결 상태가 승인으로 바뀌지 않습니다. 확정 후에는 관리자도 이 작업본을 고칠 수 없고, 정정이 필요하면 새 수정본을 만듭니다.</p>
           <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> 위 미해결 목록을 포함하여 확정하는 데 동의합니다.</label>
         </>

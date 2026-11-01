@@ -16,7 +16,7 @@ const yp = (...p: string[]) => ['workspaces', WS, 'years', Y, ...p].join('/');
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-asan',
+    projectId: 'demo-asan-rules',
     firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
   });
 });
@@ -240,5 +240,61 @@ describe('사실 확인·판단', () => {
     await assertSucceeds(setDoc(doc(db, yp('discussions', 'd1')), { targetType: 'card', targetId: 'c3', text: '의견', authorUid: 'ed3', authorName: 'ed3', createdAt: serverTimestamp() }));
     await assertFails(setDoc(doc(db, yp('discussions', 'd2')), { targetType: 'card', targetId: 'c3', text: '의견', authorUid: 'lead3', authorName: 'x', createdAt: serverTimestamp() }));
     await assertFails(updateDoc(doc(db, yp('discussions', 'd1')), { text: '바꿈' }));
+  });
+});
+
+describe('독립 운영 판단·학년 정비·제안', () => {
+  async function saveReview(db: Firestore, uid: string, version: number, opId: string, extra: Record<string, unknown> = {}) {
+    return runTransaction(db, async (tx) => {
+      tx.set(doc(db, yp('reviews', 'c3__all')), { cardId: 'c3', grade: 3, topicId: '', decision: 'independent', reason: '졸업처럼 따로 운영', cardVersion: 1, version, confirm: null, updatedBy: uid, updatedByName: uid, updatedAt: serverTimestamp(), lastOpId: opId, ...extra });
+      tx.set(doc(db, yp('events', opId)), ev(opId, uid, 'reviews', 'c3__all'));
+    });
+  }
+  it('편집자는 판단을 쓰고, 확인은 해당 학년 대표만 한다', async () => {
+    await assertSucceeds(saveReview(as('ed3'), 'ed3', 1, 'r1'));
+    await assertFails(saveReview(as('lead4'), 'lead4', 2, 'r2')); // 다른 학년
+    const confirm = (db: Firestore, uid: string, op: string) => runTransaction(db, async (tx) => {
+      tx.update(doc(db, yp('reviews', 'c3__all')), { confirm: { uid, name: uid, at: serverTimestamp(), reviewVersion: 1, cardVersion: 1 }, lastOpId: op });
+      tx.set(doc(db, yp('events', op)), ev(op, uid, 'reviews', 'c3__all'));
+    });
+    await assertFails(confirm(as('ed3'), 'ed3', 'r3'));
+    await assertFails(confirm(as('admin'), 'admin', 'r4'));
+    await assertSucceeds(confirm(as('lead3'), 'lead3', 'r5'));
+  });
+  it('판단 내용을 고치면서 확인 필드를 몰래 넣을 수 없다', async () => {
+    await assertFails(saveReview(as('ed3'), 'ed3', 1, 'r6', { confirm: { uid: 'ed3', name: 'x', at: serverTimestamp(), reviewVersion: 1, cardVersion: 1 } }));
+  });
+  it('학년 정비 완료는 해당 학년 대표만', async () => {
+    const gr = (db: Firestore, uid: string, g: number, op: string) => runTransaction(db, async (tx) => {
+      tx.set(doc(db, yp('gradeReviews', `g${g}`)), { grade: g, cardVersions: { c3: 1 }, uid, name: uid, at: serverTimestamp(), revokedAt: null, lastOpId: op });
+      tx.set(doc(db, yp('events', op)), ev(op, uid, 'gradeReviews', `g${g}`));
+    });
+    await assertFails(gr(as('ed3'), 'ed3', 3, 'g1'));
+    await assertFails(gr(as('lead3'), 'lead3', 4, 'g2'));
+    await assertSucceeds(gr(as('lead3'), 'lead3', 3, 'g3'));
+  });
+  it('제안은 논의 중으로만 만들고, 처리에는 이유가 필요하며, 열람자는 쓸 수 없다', async () => {
+    const mk = (db: Firestore, uid: string, op: string, extra: Record<string, unknown> = {}) => runTransaction(db, async (tx) => {
+      tx.set(doc(db, yp('proposals', 'p1')), { targetType: 'card', targetId: 'c3', targetVersion: 1, grade: 3, kind: 'modify', title: '제안', content: '내용', reason: '', status: 'discussing', owner: '', decisionReason: '', decidedBy: '', decidedByName: '', handover: false, appliedCardVersion: null, version: 1, createdBy: uid, createdByName: uid, createdAt: serverTimestamp(), updatedBy: uid, updatedAt: serverTimestamp(), lastOpId: op, ...extra });
+      tx.set(doc(db, yp('events', op)), ev(op, uid, 'proposals', 'p1'));
+    });
+    await assertFails(mk(as('viewer'), 'viewer', 'p0'));
+    await assertFails(mk(as('ed3'), 'ed3', 'pa', { status: 'accepted' }));
+    await assertSucceeds(mk(as('ed3'), 'ed3', 'pb'));
+    const decide = (db: Firestore, uid: string, op: string, reason: string) => runTransaction(db, async (tx) => {
+      tx.update(doc(db, yp('proposals', 'p1')), { status: 'held', decisionReason: reason, version: 2, updatedBy: uid, updatedAt: serverTimestamp(), lastOpId: op });
+      tx.set(doc(db, yp('events', op)), ev(op, uid, 'proposals', 'p1'));
+    });
+    await assertFails(decide(as('lead3'), 'lead3', 'pc', ''));
+    await assertSucceeds(decide(as('lead3'), 'lead3', 'pd', '내년에 다시'));
+  });
+  it('중복 후보 통합(두 카드 + 두 이력)은 한 번에 저장된다', async () => {
+    const db = as('ed3');
+    await assertSucceeds(runTransaction(db, async (tx) => {
+      tx.update(doc(db, yp('cards', 'c3')), { sourceOccurrences: [{ text: 'a' }], mergedFromCardIds: ['c3b'], contentVersion: 2, updatedBy: 'ed3', updatedAt: serverTimestamp(), lastOpId: 'm1' });
+      tx.update(doc(db, yp('cards', 'c3b')), { deletedAt: serverTimestamp(), deleteReason: '통합', mergedInto: 'c3', contentVersion: 2, updatedBy: 'ed3', updatedAt: serverTimestamp(), lastOpId: 'm1_b' });
+      tx.set(doc(db, yp('events', 'm1')), ev('m1', 'ed3', 'cards', 'c3'));
+      tx.set(doc(db, yp('events', 'm1_b')), ev('m1_b', 'ed3', 'cards', 'c3b'));
+    }));
   });
 });

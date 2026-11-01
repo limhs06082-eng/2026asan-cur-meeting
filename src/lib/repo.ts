@@ -105,11 +105,13 @@ export async function runOp<T>(y: string | null, opId: string, fn: (tx: Transact
     await withTimeout(runTransaction(db, fn, { maxAttempts: 4 }), 20000);
     return { ok: true };
   } catch (e) {
+    // 앞선 시도가 시간 초과로 보였지만 실제로는 서버에 반영된 경우, 재시도는 버전 충돌이나
+    // '바뀐 내용 없음'으로 보일 수 있다. 같은 작업의 이력이 있으면 성공으로 처리한다.
+    const already = y ? await opAlreadyApplied(appliedRef || yearDoc(y, 'events', opId)) : false;
+    if (already) return { ok: true, already: true };
     if (e instanceof ConflictError) return { ok: false, kind: 'conflict', message: e.message, latest: e.latest as T };
     if (e instanceof StateError) return { ok: false, kind: 'state', message: e.message };
     const code = codeOf(e);
-    const already = y ? await opAlreadyApplied(appliedRef || yearDoc(y, 'events', opId)) : false;
-    if (already) return { ok: true, already: true };
     if (code === 'permission-denied') return { ok: false, kind: 'denied', message: '권한이 없어 저장되지 않았습니다. 담당 학년·역할 또는 작업본 상태(확정·준비 중)를 확인하세요.' };
     if (code === 'unavailable' || code === 'deadline-exceeded' || code === 'timeout' || code === 'cancelled') {
       return { ok: false, kind: 'network', message: '서버 연결이 불안정해 저장을 확인하지 못했습니다. 내용은 화면에 남아 있습니다. 다시 저장을 누르면 같은 작업으로 안전하게 재시도합니다.' };
@@ -443,7 +445,7 @@ export async function removeConnection(y: string, actor: Actor, opId: string, co
 }
 
 /** 학년 대표의 연결 확인. 현재 연결 버전과 양 끝 카드 내용 버전을 함께 기록한다. */
-export async function setApproval(y: string, actor: Actor, opId: string, conn: Connection, grade: number, on: boolean): Promise<SaveOutcome<Connection>> {
+export async function setApproval(y: string, actor: Actor, opId: string, conn: Connection, grade: number, on: boolean, seen?: { from: number; to: number }): Promise<SaveOutcome<Connection>> {
   return runOp<Connection>(y, opId, async (tx) => {
     await requireEditing(tx, y);
     const cs = await tx.get(yearDoc(y, 'connections', conn.id));
@@ -454,6 +456,8 @@ export async function setApproval(y: string, actor: Actor, opId: string, conn: C
     const from = fs.data() as Card;
     const to = ts.data() as Card;
     if (on && (from.deletedAt || to.deletedAt)) throw new StateError('제외된 카드가 포함된 연결은 확인할 수 없습니다.');
+    // 대표가 화면에서 읽은 카드 내용과 서버의 카드 내용이 같을 때만 확인을 기록한다
+    if (on && seen && (seen.from !== from.contentVersion || seen.to !== to.contentVersion)) throw new StateError('확인하는 사이 연결된 카드 내용이 바뀌었습니다. 바뀐 내용을 읽고 다시 확인하세요.');
     if (grade !== cur.fromGrade && grade !== cur.toGrade) throw new StateError('이 연결과 관련된 학년만 확인할 수 있습니다.');
     const id = approvalId(conn.id, grade);
     const data: Omit<Approval, 'id'> = {
@@ -652,6 +656,18 @@ export async function setYearStatus(actor: Actor, yearId: string, from: YearDoc[
 }
 
 export async function finalizeYear(actor: Actor, yearId: string, unresolved: YearDoc['unresolvedAtFinalize']): Promise<SaveOutcome> {
+  // 화면 계산과 별개로 서버의 최신 카드·사실 확인 기록을 다시 읽어, 미확인 카드가 있으면 확정하지 않는다.
+  try {
+    const [cs, ks] = [await getDocsFromServer(yearCol(yearId, 'cards')), await getDocsFromServer(yearCol(yearId, 'cardChecks'))];
+    const checks = new Map(ks.docs.map((d) => [d.id, d.data() as CardCheck]));
+    const unchecked = cs.docs.map((d) => ({ id: d.id, ...d.data() }) as Card).filter((c) => c.grade > 0 && !c.deletedAt).filter((c) => {
+      const k = checks.get(c.id);
+      return !k || k.revokedAt || k.contentVersion !== c.contentVersion;
+    });
+    if (unchecked.length) return { ok: false, kind: 'state', message: `서버 기준으로 학년 사실 확인 전 카드가 ${unchecked.length}개 있습니다(예: ${unchecked.slice(0, 3).map((c) => c.title).join(', ')}). 확인 후 다시 확정하세요.` };
+  } catch (e) {
+    return { ok: false, kind: 'network', message: `서버 확인에 실패해 확정하지 않았습니다: ${(e as Error).message}` };
+  }
   return setYearStatus(actor, yearId, 'editing', 'final', { finalizedAt: serverTimestamp(), finalizedBy: actor.uid, finalizedByName: actor.name, unresolvedAtFinalize: unresolved });
 }
 

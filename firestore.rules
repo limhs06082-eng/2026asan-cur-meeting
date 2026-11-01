@@ -17,7 +17,8 @@ service cloud.firestore {
     function yearPath(ws, y) { return /databases/$(database)/documents/workspaces/$(ws)/years/$(y); }
     function docPath(ws, y, coll, id) { return /databases/$(database)/documents/workspaces/$(ws)/years/$(y)/$(coll)/$(id); }
 
-    function isMember(ws) { return signedIn() && exists(memberPath(ws)) && get(memberPath(ws)).data.active == true; }
+    // 문서가 없으면 get이 오류가 되어 거부된다(별도 exists 조회를 하지 않아 조회 횟수를 아낀다)
+    function isMember(ws) { return signedIn() && get(memberPath(ws)).data.active == true; }
     function me(ws) { return get(memberPath(ws)).data; }
     function hasRole(ws, r) { return isMember(ws) && r in me(ws).roles; }
     function isAdmin(ws) { return hasRole(ws, 'admin'); }
@@ -29,8 +30,8 @@ service cloud.firestore {
     function leadGrades(ws, y) { return scope(ws, y).get('lead', []); }
     function editGrades(ws, y) { return scope(ws, y).get('edit', []).concat(leadGrades(ws, y)); }
 
-    function isEditing(ws, y) { return exists(yearPath(ws, y)) && year(ws, y).status == 'editing'; }
-    function prepAdmin(ws, y) { return isAdmin(ws) && exists(yearPath(ws, y)) && year(ws, y).status == 'preparing'; }
+    function isEditing(ws, y) { return year(ws, y).status == 'editing'; }
+    function prepAdmin(ws, y) { return isAdmin(ws) && year(ws, y).status == 'preparing'; }
     // 쓰기 가능한 구성원(열람 전용이 아닌): 관리자·기획팀 또는 이 학년도 담당 학년이 있는 사람
     function isWriter(ws, y) { return isMember(ws) && (isAdmin(ws) || isPlanner(ws) || editGrades(ws, y).size() > 0); }
 

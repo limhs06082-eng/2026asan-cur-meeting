@@ -174,7 +174,7 @@ export function ConnectionDetail({ conn, onClose }: { conn: Connection; onClose:
                     : a && !a.revokedAt ? <span className="badge cs-stale">재확인 필요 — 확인 후 연결이나 카드 내용이 바뀜</span>
                     : <span className="badge st-unchecked">확인 전</span>}</td>
                   <td>
-                    {lead && !conn.deletedAt && st.state !== 'targetExcluded' && !valid ? <button className="btn tiny primary" onClick={() => quick((op) => setApproval(y.yearId!, app.actor, op, conn, g, true), `${gradeLabel(g)} 확인을 기록했습니다`)}>{gradeLabel(g)} 대표로 확인</button> : null}
+                    {lead && !conn.deletedAt && st.state !== 'targetExcluded' && !valid ? <button className="btn tiny primary" onClick={() => quick((op) => setApproval(y.yearId!, app.actor, op, conn, g, true, { from: from?.contentVersion ?? -1, to: to?.contentVersion ?? -1 }), `${gradeLabel(g)} 확인을 기록했습니다`)}>{gradeLabel(g)} 대표로 확인</button> : null}
                     {lead && a && !a.revokedAt ? <button className="btn tiny" onClick={() => quick((op) => setApproval(y.yearId!, app.actor, op, conn, g, false), '확인을 해제했습니다')}>확인 해제</button> : null}
                   </td>
                 </tr>
