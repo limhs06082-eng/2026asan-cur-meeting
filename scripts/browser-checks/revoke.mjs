@@ -9,7 +9,7 @@ const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Googl
 const page = await browser.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(e.message.slice(0, 150)));
-await page.goto('http://localhost:5174/?devLogin=teacher3@school.kr#board', { waitUntil: 'networkidle2' }).catch(() => {});
+await page.goto('http://localhost:5173/?devLogin=teacher3@school.kr#board', { waitUntil: 'networkidle2' }).catch(() => {});
 await page.waitForSelector('.chip', { timeout: 30000 });
 await setActive(false);
 await new Promise((r) => setTimeout(r, 4000));
