@@ -240,6 +240,7 @@ function Members() {
   const [members, setMembers] = useState<Member[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [editing, setEditing] = useState<Member | null>(null);
+  const [q, setQ] = useState('');
   const label = y.year?.label || new Date().getFullYear();
   useEffect(() => onSnapshot(collection(db, 'workspaces', WORKSPACE_ID, 'members'), (s) => setMembers(s.docs.map((d) => d.data() as Member).sort((a, b) => a.displayName.localeCompare(b.displayName)))), []);
   useEffect(() => onSnapshot(collection(db, 'workspaces', WORKSPACE_ID, 'accessRequests'), (s) => setRequests(s.docs.map((d) => d.data() as AccessRequest))), []);
@@ -253,9 +254,10 @@ function Members() {
         <tbody>{pending.map((r) => <tr key={r.uid}><td>{r.displayName}</td><td>{r.email}</td><td>{r.note}</td><td><button className="btn tiny primary" onClick={() => setEditing({ uid: r.uid, email: r.email, displayName: r.displayName, roles: [], scopes: {}, active: true })}>승인·권한 설정</button></td></tr>)}</tbody>
       </table>
       <h2>구성원 ({members.length}) <span className="muted small">— {label}학년도 기준 권한 표시</span></h2>
+      <input type="search" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} aria-label="구성원 검색" />
       <table className="simple">
         <thead><tr><th>이름</th><th>이메일</th><th>역할({label})</th><th>상태</th><th></th></tr></thead>
-        <tbody>{members.map((m) => (
+        <tbody>{members.filter((m) => !q || `${m.displayName} ${m.email} ${roleSummary(m, label)}`.includes(q)).map((m) => (
           <tr key={m.uid} className={m.active ? '' : 'removed'}>
             <td>{m.displayName}</td><td>{m.email}</td><td>{roleSummary(m, label)}</td><td>{m.active ? '활성' : '접근 회수됨'}</td>
             <td><button className="btn tiny" onClick={() => setEditing(m)}>권한 수정</button></td>

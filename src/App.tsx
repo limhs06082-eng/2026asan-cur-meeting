@@ -116,6 +116,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const [connEditor, setConnEditor] = useState<null | { connectionId?: string; fromCardId?: string; toCardId?: string; key: number }>(null);
   const [propEditor, setPropEditor] = useState<null | { targetType: 'card' | 'connection' | 'none'; targetId?: string; grade?: number; kind?: string }>(null);
   const perm = useMemo(() => makePerm(member, y.year), [member, y.year]);
+  const newVersion = useNewVersion();
   const actor = useMemo(() => ({ uid: member.uid, name: member.displayName || member.email, isAdmin: perm.isAdmin }), [member, perm.isAdmin]);
 
   useEffect(() => { history.replaceState(null, '', `#${view}`); }, [view]);
@@ -167,6 +168,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
             <button className="btn tiny ghost" onClick={() => { if (!hasDirtyForms() || window.confirm('저장하지 않은 내용이 있습니다. 로그아웃할까요?')) onLogout(); }}>로그아웃</button>
           </div>
         </header>
+        {newVersion ? <div className="year-banner preparing no-print">새 버전이 배포되었습니다. 작성 중인 내용을 저장한 뒤 새로고침(F5)해 주세요.</div> : null}
         {y.year && y.year.status !== 'editing' ? (
           <div className={`year-banner ${y.year.status} no-print`}>
             {y.year.status === 'final' ? `확정본입니다 (${y.year.finalizedByName || ''}). 읽기 전용이며, 정정이 필요하면 관리자가 새 수정본을 만듭니다.` : '준비 중인 작업본입니다. 등록·복제 검사가 끝나 관리자가 편집을 열 때까지 편집할 수 없습니다.'}
@@ -200,6 +202,25 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       {selConn ? <ConnectionDetail conn={selConn} onClose={() => setSelectedConnectionId(null)} /> : null}
     </AppCtx.Provider>
   );
+}
+
+/** 새 버전이 배포되면 열려 있는 화면에 새로고침 안내를 띄운다(5분마다 첫 페이지의 스크립트 이름 비교). */
+function useNewVersion(): boolean {
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (import.meta.env.DEV) return;
+    const current = Array.from(document.scripts).map((s) => s.src).find((s) => s.includes('/assets/')) || '';
+    const check = async () => {
+      try {
+        const html = await (await fetch('/', { cache: 'no-store' })).text();
+        const m = html.match(/\/assets\/[^"']+\.js/);
+        if (m && current && !current.endsWith(m[0])) setFresh(true);
+      } catch { /* 네트워크 문제는 무시 */ }
+    };
+    const t = setInterval(check, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+  return fresh;
 }
 
 function SyncStatus() {

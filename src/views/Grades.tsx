@@ -2,7 +2,7 @@
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { GRADES, gradeReadiness, gradeVersionMap, isGradeReviewValid, isCardChecked } from '../lib/domain';
-import { setGradeReview } from '../lib/repo';
+import { setGradeReview, setCardCheck } from '../lib/repo';
 import { useQuickOp, fmtTime } from '../components/ui';
 
 export function Grades() {
@@ -29,7 +29,14 @@ export function Grades() {
               {gr && !gr.revokedAt && !valid ? <p className="warn-text small">완료 표시 후 카드가 추가·수정·제외되어 다시 확인이 필요합니다.</p> : null}
               {r.unchecked.length ? (
                 <details><summary>미확인 카드 {r.unchecked.length}개</summary>
-                  <ul className="plain">{r.unchecked.map((c) => <li key={c.id}><button className="link" onClick={() => app.selectCard(c.id)}>{c.title}</button>{!c.learningPurpose.trim() ? <span className="warn-text small"> · 목적 비어 있음</span> : null}</li>)}</ul>
+                  <ul className="plain">{r.unchecked.map((c) => (
+                    <li key={c.id}>
+                      <button className="link" onClick={() => app.selectCard(c.id)}>{c.title}</button>
+                      {c.learningPurpose.trim() ? <div className="muted small">목적: {c.learningPurpose}</div> : null}
+                      {!c.learningPurpose.trim() ? <span className="warn-text small"> · 목적 비어 있음</span>
+                        : app.perm.canEditGrade(g) ? <button className="btn tiny" title={`목적: ${c.learningPurpose}`} onClick={() => quick((op) => setCardCheck(y.yearId!, app.actor, op, c, true), `‘${c.title}’ 사실 확인`)}>맞음 — 확인</button> : null}
+                    </li>
+                  ))}</ul>
                 </details>
               ) : null}
               {lead && !valid ? (
@@ -37,7 +44,7 @@ export function Grades() {
                   onClick={() => quick((op) => setGradeReview(y.yearId!, app.actor, op, g, gradeVersionMap(y.idx, g), true), `${g}학년 확인 완료를 표시했습니다`)}>우리 학년 확인 완료</button>
               ) : null}
               {lead && gr && !gr.revokedAt ? <button className="btn tiny" onClick={() => quick((op) => setGradeReview(y.yearId!, app.actor, op, g, {}, false), '완료 표시를 해제했습니다')}>완료 해제</button> : null}
-              {app.perm.canEditGrade(g) && !lead ? <p className="muted small">카드별 확인은 상세 패널에서 할 수 있습니다.</p> : null}
+              {app.perm.canEditGrade(g) ? <p className="muted small">내용이 실제 운영과 맞는지 읽은 뒤 확인하세요. 고칠 내용이 있으면 활동명을 눌러 상세 패널에서 수정합니다.</p> : null}
             </section>
           );
         })}

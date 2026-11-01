@@ -59,10 +59,11 @@ export function ConnectionsView() {
   const [state, setState] = useState<ConnState | ''>('');
   const [grade, setGrade] = useState<number | ''>('');
   const [showRemoved, setShowRemoved] = useState(false);
+  const [mine, setMine] = useState(false);
   const rows = useMemo(() => y.connections
     .map((c) => ({ c, s: connectionState(c, y.idx) }))
-    .filter(({ c, s }) => (showRemoved || !c.deletedAt) && (!type || c.type === type) && (!state || s.state === state) && (grade === '' || c.fromGrade === grade || c.toGrade === grade) && (!app.filters.topic || c.topicId === app.filters.topic))
-    .sort((a, b) => a.c.fromGrade - b.c.fromGrade || a.c.toGrade - b.c.toGrade), [y.connections, y.idx, type, state, grade, showRemoved, app.filters.topic]);
+    .filter(({ c, s }) => (!mine || (!c.deletedAt && s.state !== 'targetExcluded' && s.needGrades.some((g) => app.perm.isLead(g)))) && (showRemoved || !c.deletedAt) && (!type || c.type === type) && (!state || s.state === state) && (grade === '' || c.fromGrade === grade || c.toGrade === grade) && (!app.filters.topic || c.topicId === app.filters.topic))
+    .sort((a, b) => a.c.fromGrade - b.c.fromGrade || a.c.toGrade - b.c.toGrade), [y.connections, y.idx, type, state, grade, showRemoved, app.filters.topic, mine, app.perm]);
   const name = (id: string) => { const c = y.idx.cards.get(id); return c ? `${gradeLabel(c.grade)} ${c.title}` : '(없음)'; };
   return (
     <div className="page">
@@ -71,6 +72,7 @@ export function ConnectionsView() {
         <select value={state} onChange={(e) => setState(e.target.value as ConnState | '')} aria-label="상태"><option value="">모든 상태</option>{Object.entries(CONN_STATE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         <select value={grade} onChange={(e) => setGrade(e.target.value === '' ? '' : Number(e.target.value))} aria-label="학년"><option value="">모든 학년</option>{[0, 1, 2, 3, 4, 5, 6].map((g) => <option key={g} value={g}>{gradeLabel(g)}</option>)}</select>
         <select value={app.filters.topic} onChange={(e) => app.setFilters({ ...app.filters, topic: e.target.value })} aria-label="주제"><option value="">주제: 전체</option>{(y.year?.topics || []).map((t) => <option key={t}>{t}</option>)}</select>
+        {app.perm.leadGrades.length || app.perm.isPlanner ? <label className="check"><input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> 내 학년 확인이 필요한 연결만</label> : null}
         <label className="check"><input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} /> 취소된 연결 보기</label>
         {app.perm.canWrite ? <button className="btn primary" onClick={() => app.openConnectionEditor({})}>+ 연결 만들기</button> : null}
         <span className="muted">{rows.length}개</span>
