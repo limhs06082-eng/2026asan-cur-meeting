@@ -70,7 +70,9 @@ function Pending({ email, name, uid, inactive, onLogout }: { email: string; name
   return (
     <div className="center-screen">
       <h1>{inactive ? '접근 권한이 회수되었습니다' : '승인 대기 중'}</h1>
-      <p><strong>{email}</strong> 계정은 아직 작업 공간 구성원이 아닙니다. 관리자에게 승인을 요청하세요.</p>
+      {inactive
+        ? <p><strong>{email}</strong> 계정의 접근이 회수되었습니다. 필요하면 관리자에게 문의하세요. 이 계정이 남긴 기록은 그대로 보존됩니다.</p>
+        : <p><strong>{email}</strong> 계정은 아직 작업 공간 구성원이 아닙니다. 관리자에게 승인을 요청하세요.</p>}
       {!inactive ? (
         sent ? <p className="info-text">요청을 보냈습니다. 관리자가 승인하면 이 화면이 자동으로 바뀝니다.</p> : (
           <div className="box narrow">

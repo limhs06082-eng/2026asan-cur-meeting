@@ -73,7 +73,10 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
     }
   }, [years, yearsLoaded, yearId]);
 
+  // 보이는 작업본 목록에서 확인된 ID만 구독한다(권한 없는 작업본을 구독했다가 바로 바꾸면 SDK 오류가 날 수 있음)
+  const activeYearId = yearsLoaded && yearId && years.some((y) => y.id === yearId) ? yearId : null;
   useEffect(() => {
+    const yearId = activeYearId;
     if (!yearId) return;
     setYear(null);
     setData(Object.fromEntries(COLLS.map((c) => [c, []])) as never);
@@ -93,7 +96,7 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
       }, (e) => setError(`${c}: ${e.message}`)));
     }
     return () => unsubs.forEach((u) => u());
-  }, [yearId]);
+  }, [activeYearId]);
 
   const value = useMemo<YearData>(() => {
     const cards = data.cards as Card[];
