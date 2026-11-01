@@ -78,6 +78,7 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
     setYear(null);
     setData(Object.fromEntries(COLLS.map((c) => [c, []])) as never);
     setMeta({});
+    setError(null);
     const unsubs: Array<() => void> = [];
     unsubs.push(onSnapshot(yearRef(yearId), { includeMetadataChanges: true }, (s) => {
       setYear(s.exists() ? ({ id: s.id, ...s.data() } as YearDoc) : null);

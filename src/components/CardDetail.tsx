@@ -220,7 +220,8 @@ export function CardDetail({ card }: { card: Card }) {
           {r.updatedByName} 작성 · {ok ? `✓ ${r.confirm!.name} 확인` : r.confirm ? '확인 후 내용이 바뀌어 재확인 필요' : '학년 대표 확인 전'}
         </div>
         <span className="row-wrap">
-          {app.perm.isLead(c.grade) && r.decision === 'independent' && !ok ? <button className="btn tiny primary" onClick={() => quick((op) => confirmReview(yid, app.actor, op, r, true), '독립 운영 판단을 확인했습니다')}>학년 대표 확인</button> : null}
+          {r.cardVersion !== c.contentVersion ? <span className="warn-text small">카드가 바뀐 뒤라 판단을 다시 저장해야 확인할 수 있습니다.</span> : null}
+          {app.perm.isLead(c.grade) && r.decision === 'independent' && !ok && r.cardVersion === c.contentVersion ? <button className="btn tiny primary" onClick={() => quick((op) => confirmReview(yid, app.actor, op, r, true), '독립 운영 판단을 확인했습니다')}>학년 대표 확인</button> : null}
           {app.perm.isLead(c.grade) && r.confirm ? <button className="btn tiny" onClick={() => quick((op) => confirmReview(yid, app.actor, op, r, false), '확인을 해제했습니다')}>확인 해제</button> : null}
           {canEdit ? <button className="btn tiny ghost" onClick={() => setDialog({ review: r.topicId })}>고치기</button> : null}
         </span>
