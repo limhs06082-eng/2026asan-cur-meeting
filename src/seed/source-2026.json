@@ -1,0 +1,211 @@
+{
+  "schema": "asan-source-seed",
+  "seedVersion": "2026-source-seed-v1",
+  "source": {
+    "id": "src-2026-glance",
+    "name": "2026 교육과정 - 아산이와 새꿈이 교육활동 한눈에 보기.pdf",
+    "path": "H:/내 드라이브/2026 교무/0. 교육과정/1. 학교교육과정/2026 교육과정 - 아산이와 새꿈이 교육활동 한눈에 보기.pdf",
+    "kind": "pdf",
+    "pages": 1,
+    "sha256": "52f6a7c4263ecb96c6e335ff014ff742f66d57b46594a2f43f1fd28bc86256b2",
+    "note": "원본 1쪽 표를 사람이 읽어 옮긴 초안입니다. 배움·자람·나눔 태그는 원본 아이콘 판독값이며 학년 확인이 필요합니다. 아이콘이 없는 행은 빈 값으로 두었습니다."
+  },
+  "categories": [
+    { "id": "common", "name": "공통 교육과정·기타", "order": 1 },
+    { "id": "expansion", "name": "확장 프로젝트", "order": 2 },
+    { "id": "instrument", "name": "악기 익히기", "order": 3 },
+    { "id": "info", "name": "정보교육", "order": 4 },
+    { "id": "autonomy", "name": "학교자율시간", "order": 5 },
+    { "id": "gradeProject", "name": "학년 프로젝트", "order": 6 },
+    { "id": "reading", "name": "독서교육", "order": 7 },
+    { "id": "gradeSpecial", "name": "학년 특색활동", "order": 8 },
+    { "id": "village", "name": "마을교육과정", "order": 9 },
+    { "id": "selfgov", "name": "학생 자치", "order": 10 }
+  ],
+  "topics": ["독서·표현", "지역 탐구", "예술·악기", "디지털·정보", "생태·환경", "자치·관계", "진로·꿈", "공동체·행사", "건강·안전", "적응·이음"],
+  "rows": [
+    { "category": "common", "grade": 0, "cell": "공통 교육과정(병합 셀)", "items": [
+      { "text": "배움열기프로젝트: 관계 맺기, 학급 세우기, 1년 살이 계획하기, 출발점 찾기 등", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "학년 체육대회", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "생존수영교육", "flags": ["적용 학년 확인 필요(병합 셀) — 특정 학년 대상일 수 있음"] },
+      { "text": "배움마무리프로젝트(12월 예정): 나의 배움과 성장 돌아보기, 학년도 배움 다짐하기 등", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "독도&통일 나라사랑", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "학교폭력 예방교육 등", "flags": ["적용 학년 확인 필요(병합 셀)"] }
+    ]},
+    { "category": "common", "grade": 0, "cell": "기타(병합 셀)", "items": [
+      { "text": "학교사랑주간 운영 - 개교기념일 축하 잔치", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "어린이날 축하 행사", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "입학백일축하 잔치", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "행복놀이 시간 운영", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "지구를 지키는 생태전환교육 활동", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "6학년 형님들 졸업 축하 준비 주간(12월)", "flags": ["적용 학년 확인 필요(병합 셀)"] },
+      { "text": "방학 캠프 (희망학생 참여)", "flags": ["적용 학년 확인 필요(병합 셀)"] }
+    ]},
+
+    { "category": "expansion", "grade": 1, "items": [{ "text": "우리 학교, 어디까지 아니?" }] },
+    { "category": "expansion", "grade": 2, "items": [{ "text": "우리 동네, 어디까지 아니?" }] },
+    { "category": "expansion", "grade": 3, "items": [{ "text": "아산, 어디까지 아니?" }] },
+    { "category": "expansion", "grade": 4, "items": [{ "text": "충청남도, 어디까지 아니?" }] },
+    { "category": "expansion", "grade": 5, "items": [{ "text": "우리나라(역사), 어디까지 아니?" }] },
+    { "category": "expansion", "grade": 6, "items": [{ "text": "세계, 어디까지 아니?" }] },
+
+    { "category": "instrument", "grade": 1, "items": [{ "text": "리듬악기" }] },
+    { "category": "instrument", "grade": 2, "items": [{ "text": "소고" }] },
+    { "category": "instrument", "grade": 3, "items": [{ "text": "리코더" }] },
+    { "category": "instrument", "grade": 4, "items": [{ "text": "리코더" }] },
+    { "category": "instrument", "grade": 5, "items": [{ "text": "단소" }] },
+    { "category": "instrument", "grade": 6, "items": [{ "text": "소금" }] },
+
+    { "category": "info", "grade": 1, "items": [{ "text": "사이버 예절교육" }] },
+    { "category": "info", "grade": 2, "items": [{ "text": "사이버 예절교육" }] },
+    { "category": "info", "grade": 3, "items": [{ "text": "한글 타자 익히기" }] },
+    { "category": "info", "grade": 4, "items": [{ "text": "문서 작성 기초" }] },
+    { "category": "info", "grade": 5, "items": [{ "text": "PPT 활용한 발표, SW/AI교육", "flags": ["한 칸에 두 활동 — 별도 활동인지 묶음인지 확인"] }] },
+    { "category": "info", "grade": 6, "items": [{ "text": "협업 도구 활용, SW/AI교육", "flags": ["한 칸에 두 활동 — 별도 활동인지 묶음인지 확인"] }] },
+
+    { "category": "autonomy", "grade": 1, "items": [{ "text": "동동동 프로젝트(몸짓으로 표현하기)", "flags": ["원본 행 이름은 '학교자율시간' — 실제 편성 영역(교과·창체 등) 확인 필요"] }] },
+    { "category": "autonomy", "grade": 2, "items": [{ "text": "그림책 배움 이야기(낭독극, 연극놀이)", "flags": ["원본 행 이름은 '학교자율시간' — 실제 편성 영역(교과·창체 등) 확인 필요", "한 칸에 여러 활동 — 별도 활동인지 묶음인지 확인"] }] },
+    { "category": "autonomy", "grade": 3, "items": [{ "text": "북티쉐, 시 맛보기(즉흥극, 역할극)", "flags": ["한 칸에 여러 활동 — 별도 활동인지 묶음인지 확인"] }] },
+    { "category": "autonomy", "grade": 4, "items": [{ "text": "친구랑 함께 읽어요(인형극, 그림자극)", "flags": ["한 칸에 여러 활동 — 별도 활동인지 묶음인지 확인"] }] },
+    { "category": "autonomy", "grade": 5, "items": [{ "text": "책읽는 교실(아산이 연극제)", "flags": ["한 칸에 여러 활동 — 별도 활동인지 묶음인지 확인"] }] },
+    { "category": "autonomy", "grade": 6, "items": [{ "text": "책 읽는 교실(새꿈이 영상제)", "flags": ["한 칸에 여러 활동 — 별도 활동인지 묶음인지 확인"] }] },
+
+    { "category": "gradeProject", "grade": 1, "items": [
+      { "text": "입학적응활동 프로젝트", "tags": ["배움"] },
+      { "text": "한글과 놀아요 프로젝트", "tags": ["배움"] },
+      { "text": "마음을 나누며 함께 놀아요", "tags": ["자람"] }
+    ]},
+    { "category": "gradeProject", "grade": 2, "items": [
+      { "text": "자연, 만남, 추구 프로젝트 - 청댕이길 숲 체험", "tags": ["자람"] },
+      { "text": "6학년과 함께 하는 세계여행 프로젝트", "tags": ["나눔"], "flags": ["학년 간 공동활동 — 6학년과 함께 확인"] }
+    ]},
+    { "category": "gradeProject", "grade": 3, "items": [
+      { "text": "옛날과 오늘날 프로젝트", "tags": ["배움"] },
+      { "text": "생태환경 프로젝트(텃밭, 동물의 한 살이 관찰 등)", "tags": ["자람"] }
+    ]},
+    { "category": "gradeProject", "grade": 4, "items": [
+      { "text": "위풍당당 프로젝트(다문화, 다양성 교육, 체육대회)", "tags": ["배움"] },
+      { "text": "매력 퐁퐁 프로젝트(예술동아리, 체험활동, 전시회 등)", "tags": ["자람"] }
+    ]},
+    { "category": "gradeProject", "grade": 5, "items": [
+      { "text": "지구 지킴이 프로젝트(환경기념일, 환경 도서 읽기, 동식물 기르기)", "tags": ["배움"] },
+      { "text": "아산이캠프", "tags": ["자람"] }
+    ]},
+    { "category": "gradeProject", "grade": 6, "items": [
+      { "text": "새꿈이캠프(진로프로그램, 새꿈이 부스, 어울림 체육대회, 꿈끼발표회)", "tags": ["자람"] },
+      { "text": "졸업 프로젝트", "tags": ["자람"] }
+    ]},
+
+    { "category": "reading", "grade": 1, "items": [
+      { "text": "책 읽어주는 선생님", "tags": ["배움"] },
+      { "text": "생각을 키우는 독후활동", "tags": ["자람"] }
+    ]},
+    { "category": "reading", "grade": 2, "items": [
+      { "text": "온책읽기(틈새독서)", "tags": ["배움"] },
+      { "text": "작가와의 만남", "tags": ["배움"] },
+      { "text": "책 꼬마 선생님(낭독극)", "tags": ["자람"] }
+    ]},
+    { "category": "reading", "grade": 3, "items": [
+      { "text": "온책읽기", "tags": ["배움"] },
+      { "text": "낭독극", "tags": ["자람"] },
+      { "text": "문집 글쓰기", "tags": ["배움"] }
+    ]},
+    { "category": "reading", "grade": 4, "items": [
+      { "text": "온책읽기", "tags": ["배움"] },
+      { "text": "작가와의 만남", "tags": ["배움"] },
+      { "text": "즉흥극", "tags": ["자람"] }
+    ]},
+    { "category": "reading", "grade": 5, "items": [
+      { "text": "온책읽기", "tags": ["배움"] },
+      { "text": "독서골든벨", "tags": ["배움"] },
+      { "text": "아산이 연극제", "tags": ["자람"] }
+    ]},
+    { "category": "reading", "grade": 6, "items": [
+      { "text": "온책읽기 독서골든벨", "tags": ["배움"], "flags": ["한 줄에 두 활동 — 별도 활동인지 묶음인지 확인"] },
+      { "text": "작가와의 만남", "tags": ["배움"] },
+      { "text": "새꿈이 영상제", "tags": ["자람"] }
+    ]},
+
+    { "category": "gradeSpecial", "grade": 1, "items": [
+      { "text": "유치원 이음교육", "tags": ["나눔"] },
+      { "text": "1인 1운동(줄넘기)", "tags": ["자람"] },
+      { "text": "꿈끼발표회", "tags": ["나눔"] },
+      { "text": "인형극(기후위기, 흡연예방)", "tags": ["나눔"] },
+      { "text": "전래놀이 지원단 수업", "tags": ["배움"] },
+      { "text": "가을탐험 체험활동", "tags": ["자람"] },
+      { "text": "예술 강사 표현놀이", "tags": ["자람"] }
+    ]},
+    { "category": "gradeSpecial", "grade": 2, "items": [
+      { "text": "학년 체육대회", "tags": ["나눔"] },
+      { "text": "전래놀이 지원단 수업", "tags": ["배움"] },
+      { "text": "안전체험관 현장학습", "tags": ["배움"] },
+      { "text": "꿈끼발표회", "tags": ["나눔"] },
+      { "text": "사이좋은 우리들(상담수업)", "tags": ["나눔"] },
+      { "text": "기악-소고 동아리", "tags": ["자람"] },
+      { "text": "학교로 찾아오는 통일교육", "tags": ["배움"] }
+    ]},
+    { "category": "gradeSpecial", "grade": 3, "items": [
+      { "text": "리코더 오름길", "tags": ["자람"] },
+      { "text": "생태 수업", "tags": ["자람"] },
+      { "text": "전통 떡 만들기(영양수업)", "tags": ["자람"] },
+      { "text": "도서관과 친해지기", "tags": ["배움"] },
+      { "text": "컴퓨터 타자 연습", "tags": ["배움"] }
+    ]},
+    { "category": "gradeSpecial", "grade": 4, "items": [
+      { "text": "행복한 우리 마음on(인성교육)", "tags": ["자람"] },
+      { "text": "한달 한책 읽기", "tags": ["배움"] },
+      { "text": "학급 대항 피구 리그전", "tags": ["나눔"] },
+      { "text": "리코더 급수제", "tags": ["자람"] },
+      { "text": "예술체험활동", "tags": ["자람"] }
+    ]},
+    { "category": "gradeSpecial", "grade": 5, "items": [
+      { "text": "인문동아리(북적북적 책 탐구)", "tags": ["배움"] },
+      { "text": "현장체험학습", "tags": ["배움"] },
+      { "text": "학급 대항 티볼 리그전", "tags": ["나눔"] },
+      { "text": "경제교육(충남경제교육센터)", "tags": ["배움"] }
+    ]},
+    { "category": "gradeSpecial", "grade": 6, "items": [
+      { "text": "SW·AI 프로그램 - 네오쏘코, 온라인 코딩파티", "tags": ["배움"] },
+      { "text": "학급 대항 빅발리볼 리그전", "tags": ["나눔"] },
+      { "text": "현장체험학습(독립기념관)", "tags": ["배움"] },
+      { "text": "졸업여행(에버랜드)", "tags": ["자람"] },
+      { "text": "졸업식 전야제", "tags": ["나눔"] }
+    ]},
+
+    { "category": "village", "grade": 1, "items": [{ "text": "그림책 표현놀이", "tags": ["배움"] }] },
+    { "category": "village", "grade": 2, "items": [
+      { "text": "연극놀이", "tags": ["자람"] },
+      { "text": "청댕이길 숲 체험", "tags": ["자람"] }
+    ]},
+    { "category": "village", "grade": 3, "items": [{ "text": "우리학교 생태숲 지도 그리기", "tags": ["배움"] }] },
+    { "category": "village", "grade": 4, "items": [{ "text": "우리학교 생태숲 지도 그리기", "tags": ["배움"] }] },
+    { "category": "village", "grade": 5, "items": [{ "text": "방울토마토 화분 만들기", "tags": ["자람"] }] },
+    { "category": "village", "grade": 6, "items": [{ "text": "공동체 놀이", "tags": ["나눔"] }] },
+
+    { "category": "selfgov", "grade": 1, "items": [
+      { "text": "학급 다모임(생일잔치)", "tags": ["나눔"] },
+      { "text": "학년 다모임(배움마무리)", "tags": ["자람"] }
+    ]},
+    { "category": "selfgov", "grade": 2, "items": [
+      { "text": "다모임&생일잔치", "tags": ["나눔"] },
+      { "text": "꿈끼 발표회", "tags": ["나눔"] }
+    ]},
+    { "category": "selfgov", "grade": 3, "items": [
+      { "text": "다모임(학급, 학년다모임)", "tags": ["자람"] },
+      { "text": "학기별 배움잔치", "tags": ["자람"] }
+    ]},
+    { "category": "selfgov", "grade": 4, "items": [
+      { "text": "학급 다모임(생일잔치)", "tags": ["나눔"] },
+      { "text": "학년 다모임(알뜰시장)", "tags": ["나눔"] }
+    ]},
+    { "category": "selfgov", "grade": 5, "items": [
+      { "text": "학급 다모임 및 대의원 회의", "tags": ["자람"] },
+      { "text": "리더십캠프", "tags": ["자람"] },
+      { "text": "2026 학생자치회 임원 선거", "tags": ["자람"] }
+    ]},
+    { "category": "selfgov", "grade": 6, "items": [
+      { "text": "다모임(학급, 학년다모임)", "tags": ["자람"] },
+      { "text": "학생자율동아리", "tags": ["나눔"] }
+    ]}
+  ]
+}
