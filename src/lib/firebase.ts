@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { connectFirestoreEmulator, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { connectFirestoreEmulator, initializeFirestore, memoryLocalCache, memoryLruGarbageCollector } from 'firebase/firestore';
 
 const env = import.meta.env;
 
@@ -12,7 +12,11 @@ export const firebaseApp = initializeApp({
 });
 
 // PRD 10.2: 첫 버전은 영구 오프라인 캐시를 켜지 않는다(메모리 캐시만 사용).
-export const db = initializeFirestore(firebaseApp, { localCache: memoryLocalCache() });
+// 메모리 캐시는 구독을 끊어도 받은 문서와 재개 토큰을 남겨 두는 LRU 방식으로 둔다. 같은 탭에서 다시 구독하면
+// (계정 전환·카드 다시 열기·작업본 되돌아가기) 30분 안에는 바뀐 문서만 서버에서 받아 읽기 사용량이 줄어든다. 새로고침하면 비워진다.
+// 개발(에뮬레이터) 전용 ?devLongPoll: 읽기량 측정 스크립트가 응답 본문을 셀 수 있게 롱폴링을 쓴다.
+const devLongPoll = env.VITE_USE_EMULATOR === '1' && new URLSearchParams(location.search).has('devLongPoll');
+export const db = initializeFirestore(firebaseApp, { localCache: memoryLocalCache({ garbageCollector: memoryLruGarbageCollector() }), ...(devLongPoll ? { experimentalForceLongPolling: true } : {}) });
 export const auth = getAuth(firebaseApp);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -37,3 +41,4 @@ export const DEV_PARAMS = USE_EMULATOR ? new URLSearchParams(location.search) : 
 
 export const WORKSPACE_ID: string = env.VITE_WORKSPACE_ID || 'asan';
 export const PROJECT_ID: string = env.VITE_FIREBASE_PROJECT_ID;
+

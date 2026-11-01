@@ -20,6 +20,7 @@ const Ctx = createContext<{ state: AuthState; signIn: () => Promise<void>; logou
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [member, setMember] = useState<Member | null | undefined>(undefined);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u); setMember(undefined); }), []);
 
@@ -34,12 +35,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const state: AuthState = useMemo(() => {
-    if (user === undefined) return { status: 'loading' };
+    if (user === undefined || leaving) return { status: 'loading' };
     if (user === null) return { status: 'signedOut' };
     if (member === undefined) return { status: 'loading' };
     if (!member || !member.active) return { status: 'pending', user, inactive: !!member && !member.active };
     return { status: 'member', user, member };
-  }, [user, member]);
+  }, [user, member, leaving]);
 
   const value = useMemo(() => ({
     state,
@@ -54,10 +55,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     },
     logout: async () => {
-      // 로그아웃 시 화면·메모리 상태 정리: 페이지를 새로 불러 구독과 캐시를 모두 비운다.
-      await signOut(auth);
-      try { await terminate(db); await clearIndexedDbPersistence(db); } catch { /* 메모리 캐시만 사용 */ }
-      window.location.replace(window.location.pathname);
+      if (state.status === 'member' && state.member.roles.includes('admin')) {
+        // 관리자는 구성원 명단(이메일)까지 받아 두므로 페이지를 새로 불러 구독과 캐시를 모두 비운다.
+        await signOut(auth);
+        try { await terminate(db); await clearIndexedDbPersistence(db); } catch { /* 메모리 캐시만 사용 */ }
+        window.location.replace(window.location.pathname);
+        return;
+      }
+      // 교사 계정: 화면(구독)을 먼저 내린 뒤 로그아웃한다. 화면 상태는 모두 사라지지만 받은 작업본 문서는 메모리 캐시에 남아,
+      // 같은 창에서 다음 선생님이 로그인하면 바뀐 문서만 서버에서 받는다(노트북을 돌려 쓸 때 읽기 사용량 절약).
+      setLeaving(true);
+      await new Promise((r) => setTimeout(r, 0));
+      try { await signOut(auth); } finally { setLeaving(false); }
     },
   }), [state]);
 
