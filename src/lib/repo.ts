@@ -314,16 +314,21 @@ export async function splitCommonCard(y: string, actor: Actor, opBase: string, c
       await requireEditing(tx, y);
       const ref = yearDoc(y, 'cards', id);
       const ex = await tx.get(ref);
+      // 화면의 객체가 아니라 서버의 최신 공통 카드 내용을 복사한다
+      const srcSnap = await tx.get(yearDoc(y, 'cards', card.id));
       if (ex.exists()) return; // 이미 나눠진 학년
-      const content = normalizeDraft({ ...(pick(card, CARD_CONTENT_FIELDS) as unknown as CardContent), grade: g } as CardDraft);
+      if (!srcSnap.exists()) throw new StateError('공통 카드를 찾을 수 없습니다.');
+      const src = { id: srcSnap.id, ...srcSnap.data() } as Card;
+      if (src.deletedAt) throw new StateError('제외된 공통 카드는 나눌 수 없습니다.');
+      const content = normalizeDraft({ ...(pick(src, CARD_CONTENT_FIELDS) as unknown as CardContent), grade: g } as CardDraft);
       tx.set(ref, {
         ...content,
         grade: g,
         commonGroupId: card.id,
         checkFlags: content.checkFlags.filter((f) => !f.startsWith('적용 학년')),
-        sourceOccurrences: card.sourceOccurrences,
+        sourceOccurrences: src.sourceOccurrences,
         origin: 'common-split',
-        addReason: `학교 공통 활동 ‘${card.title}’을 ${gradeLabel(g)} 카드로 나눔`,
+        addReason: `학교 공통 활동 ‘${src.title}’을 ${gradeLabel(g)} 카드로 나눔`,
         originCardId: null, originYearId: null, mergedFromCardIds: [], mergedInto: null,
         deletedAt: null, deleteReason: '', contentVersion: 1,
         updatedBy: actor.uid, updatedByName: actor.name, updatedAt: serverTimestamp(), lastOpId: opId,

@@ -1,5 +1,6 @@
 // 출력: 한눈에 보기(A3 가로 / A4 분할), 연결 설명·변경 기록·미해결 목록. 한 시점의 스냅샷으로 만든다.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { DEV_PARAMS } from '../lib/firebase';
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { applyFilters } from '../components/Filters';
@@ -15,11 +16,13 @@ interface Snap { at: Date; year: YearDoc; idx: Index; cards: Card[]; proposals: 
 export function Output() {
   const app = useApp();
   const y = useYear();
-  const [mode, setMode] = useState<'a3' | 'a4' | 'notes' | 'cards'>('a3');
+  const [mode, setMode] = useState<'a3' | 'a4' | 'notes' | 'cards'>((DEV_PARAMS.get('devPrint') as 'a3') || 'a3');
   const [usePurpose, setUsePurpose] = useState(true);
   const [useFilter, setUseFilter] = useState(false);
   const [snap, setSnap] = useState<Snap | null>(null);
   const ready = y.sync.loaded && !y.sync.fromCache && !!y.year;
+  // 개발 점검용: ?devPrint= 가 있으면 준비되는 대로 스냅샷을 만든다(에뮬레이터 전용)
+  useEffect(() => { if (DEV_PARAMS.get('devPrint') && ready && !snap) make(); });
 
   const make = () => {
     if (!y.year) return;
@@ -197,7 +200,9 @@ function Notes({ s }: { s: Snap }) {
   const name = (id: string) => { const c = idx.cards.get(id); return c ? `${gradeLabel(c.grade)} ‘${c.title}’` : '(없음)'; };
   const conns = idx.connections.filter((c) => !c.deletedAt && (ids.has(c.fromCardId) || ids.has(c.toCardId))).sort((a, b) => a.fromGrade - b.fromGrade);
   const indep = idx.reviews.filter((r) => r.decision === 'independent' && isReviewConfirmed(r, idx) && ids.has(r.cardId));
-  const changes = s.cards.filter((c) => c.changeType || c.deletedAt).sort((a, b) => a.grade - b.grade);
+  // 수정·추가·종료·제외는 한 줄씩, 유지는 학년별로 묶어 짧게 보인다
+  const changes = s.cards.filter((c) => c.deletedAt || (c.changeType && c.changeType !== 'keep')).sort(compareCards);
+  const kept = s.cards.filter((c) => !c.deletedAt && c.changeType === 'keep').sort(compareCards);
   const un = unresolvedSummary(idx);
   const handover = s.proposals.filter((p) => p.handover || p.status === 'held');
   const decided = s.proposals.filter((p) => p.status === 'accepted' || p.status === 'rejected');
@@ -229,7 +234,7 @@ function Notes({ s }: { s: Snap }) {
       <h2>2. 독립 운영으로 합의한 활동 ({indep.length})</h2>
       <ul>{indep.map((r) => <li key={r.id}>{name(r.cardId)} — {r.topicId || '전체'}: {r.reason} (확인: {r.confirm?.name})</li>)}</ul>
       {indep.length === 0 ? <p className="muted">없음</p> : null}
-      <h2>3. 유지·수정·추가·종료 및 제외 목록 ({changes.length})</h2>
+      <h2>3. 유지·수정·추가·종료 및 제외 목록 (수정·추가·종료·제외 {changes.length} / 유지 {kept.length})</h2>
       <table className="simple print-table">
         <thead><tr><th>학년</th><th>활동</th><th>변경</th><th>이유</th></tr></thead>
         <tbody>
@@ -238,6 +243,14 @@ function Notes({ s }: { s: Snap }) {
           ))}
         </tbody>
       </table>
+      {kept.length ? (
+        <div className="kept">
+          <strong>유지</strong>
+          {[0, 1, 2, 3, 4, 5, 6].filter((g) => kept.some((c) => c.grade === g)).map((g) => (
+            <p key={g}>{gradeLabel(g)}: {kept.filter((c) => c.grade === g).map((c) => c.title).join(' · ')}</p>
+          ))}
+        </div>
+      ) : null}
       <h2>4. 미해결·보류 사항</h2>
       <ul>
         <li>학년 사실 확인 전 카드: {un.uncheckedCards.length}개</li>

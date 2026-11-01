@@ -2,7 +2,7 @@
 // 댓글·변경 이력은 여기서 구독하지 않고 상세 화면을 열 때 제한된 범위로 조회한다.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { collection, onSnapshot, type QuerySnapshot } from 'firebase/firestore';
-import { db, WORKSPACE_ID } from './firebase';
+import { db, WORKSPACE_ID, DEV_PARAMS } from './firebase';
 import { yearCol, yearRef } from './repo';
 import type {
   Approval, Card, CardCheck, Connection, DupDecision, GradeReview, Proposal, Review, YearDoc,
@@ -43,7 +43,7 @@ function writeLS(v: string) { try { localStorage.setItem(LS_KEY, v); } catch { /
 export function YearDataProvider({ children, includePreparing }: { children: ReactNode; includePreparing: boolean }) {
   const [years, setYears] = useState<YearDoc[]>([]);
   const [yearsLoaded, setYearsLoaded] = useState(false);
-  const [yearId, setYearIdState] = useState<string | null>(readLS());
+  const [yearId, setYearIdState] = useState<string | null>(DEV_PARAMS.get('devYear') || readLS());
   const [year, setYear] = useState<YearDoc | null>(null);
   const [data, setData] = useState<Record<CollName, unknown[]>>(() => Object.fromEntries(COLLS.map((c) => [c, []])) as never);
   const [meta, setMeta] = useState<Record<string, { fromCache: boolean; pending: boolean; loaded: boolean }>>({});

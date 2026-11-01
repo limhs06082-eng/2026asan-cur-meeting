@@ -29,7 +29,11 @@ if (USE_EMULATOR) {
     const token = JSON.stringify({ sub: email.replace(/[^a-z0-9]/gi, ''), email, email_verified: true, name });
     return signInWithCredential(auth, GoogleAuthProvider.credential(token));
   };
+  // 인쇄 점검용: ?devLogin=이메일 이면 자동으로 시험 계정 로그인
+  const devLogin = new URLSearchParams(location.search).get('devLogin');
+  if (devLogin) void auth.authStateReady().then(() => { if (!auth.currentUser) void (window as unknown as { __devSignIn: (e: string, n: string) => Promise<unknown> }).__devSignIn(devLogin, '점검'); });
 }
+export const DEV_PARAMS = USE_EMULATOR ? new URLSearchParams(location.search) : new URLSearchParams();
 
 export const WORKSPACE_ID: string = env.VITE_WORKSPACE_ID || 'asan';
 export const PROJECT_ID: string = env.VITE_FIREBASE_PROJECT_ID;

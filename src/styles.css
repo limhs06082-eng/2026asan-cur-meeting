@@ -282,6 +282,8 @@ tr.removed { opacity: 0.5; }
 .print-legend { font-size: 8.5pt; color: #555; margin-top: 4px; }
 .print-table { font-size: 9.5pt; }
 .notes h2 { font-size: 1.05rem; margin-top: 12px; border-bottom: 1px solid #999; }
+.kept { font-size: 9pt; margin-top: 6px; }
+.kept p { margin: 2px 0; }
 
 @page a3 { size: A3 landscape; margin: 8mm; }
 @page a4l { size: A4 landscape; margin: 8mm; }

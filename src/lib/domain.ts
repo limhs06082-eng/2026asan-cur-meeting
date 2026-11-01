@@ -469,6 +469,6 @@ export function threeWayMerge<T extends Record<string, unknown>>(base: T, mine: 
 export function compareCards(a: Card, b: Card): number {
   const oa = a.sourceOccurrences[0];
   const ob = b.sourceOccurrences[0];
-  const cell = (o?: { gradeCell: string }) => (o ? (o.gradeCell.startsWith('기타') ? 1 : 0) : 2);
-  return a.grade - b.grade || cell(oa) - cell(ob) || (oa?.order ?? 999) - (ob?.order ?? 999) || a.title.localeCompare(b.title, 'ko');
+  const cell = (o?: { gradeCell?: string }) => (o ? ((o.gradeCell || '').startsWith('기타') ? 1 : 0) : 2);
+  return a.grade - b.grade || cell(oa) - cell(ob) || (oa?.order ?? 999) - (ob?.order ?? 999) || (a.title || '').localeCompare(b.title || '', 'ko');
 }
