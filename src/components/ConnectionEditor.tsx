@@ -99,6 +99,12 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
             <CardPicker label={draft.type === 'deepen' ? '3. 깊어지는 배움(도착 카드)' : '3. 카드 B'} value={draft.toCardId} onChange={(v) => set('toCardId', v)} exclude={draft.fromCardId} />
           </div>
           {dup ? <div className="alert warn">같은 연결이 이미 있습니다.</div> : null}
+          {from || to ? (
+            <div className="form-grid purposes">
+              <div className="box small"><strong>{from ? `${gradeLabel(from.grade)} ${from.title}` : '시작 카드'}</strong><div className="muted">{from?.learningPurpose || '배움의 목적이 아직 없습니다.'}</div></div>
+              <div className="box small"><strong>{to ? `${gradeLabel(to.grade)} ${to.title}` : '도착 카드'}</strong><div className="muted">{to?.learningPurpose || '배움의 목적이 아직 없습니다.'}</div></div>
+            </div>
+          ) : null}
         </>
       )}
       <div className="form-grid">
