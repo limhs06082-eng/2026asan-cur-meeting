@@ -33,6 +33,8 @@ service cloud.firestore {
     function isEditing(ws, y) { return year(ws, y).status == 'editing'; }
     function prepAdmin(ws, y) { return isAdmin(ws) && year(ws, y).status == 'preparing'; }
     // 쓰기 가능한 구성원(열람 전용이 아닌): 관리자·기획팀 또는 이 학년도 담당 학년이 있는 사람
+    // 준비 중(등록·복제 검사 전) 작업본의 내용은 관리자만 읽는다(부분 자료 비공개)
+    function canReadYear(ws, y) { return isMember(ws) && (year(ws, y).status != 'preparing' || isAdmin(ws)); }
     function isWriter(ws, y) { return isMember(ws) && (isAdmin(ws) || isPlanner(ws) || editGrades(ws, y).size() > 0); }
 
     // 카드 학년 편집 권한. 0 = 학교 공통 카드(기획팀·관리자 관리)
@@ -110,7 +112,7 @@ service cloud.firestore {
 
         // 이력: 생성만 가능. 행위자·서버 시각 검증. 대상 문서가 같은 요청에서 이 operationId로 바뀌어야 한다.
         match /events/{opId} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create: if prepAdmin(ws, y) || (
             isWriter(ws, y)
             && (isEditing(ws, y) || (request.resource.data.targetColl == 'meta' && isAdmin(ws)))
@@ -147,7 +149,7 @@ service cloud.firestore {
             .hasAny(['origin', 'originCardId', 'originYearId', 'grade']);
         }
         match /cards/{cardId} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create: if prepAdmin(ws, y) || (
             isEditing(ws, y) && validCard(request.resource.data)
             && (canEditGrade(ws, y, request.resource.data.grade)
@@ -175,7 +177,7 @@ service cloud.firestore {
 
         // ── 학년 사실 확인: 해당 학년 편집자, 현재 카드 버전, 배움의 목적 필수
         match /cardChecks/{cardId} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create, update: if prepAdmin(ws, y) || (
             isEditing(ws, y)
             && request.resource.data.cardId == cardId
@@ -195,7 +197,7 @@ service cloud.firestore {
 
         // ── 학년 정비 완료: 해당 학년 대표만
         match /gradeReviews/{gid} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create, update: if prepAdmin(ws, y) || (
             isEditing(ws, y)
             && request.resource.data.grade is int
@@ -225,7 +227,7 @@ service cloud.firestore {
         }
         function cardOf(ws, y, id) { return get(docPath(ws, y, 'cards', id)).data; }
         match /connections/{connId} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create: if prepAdmin(ws, y) || (
             isEditing(ws, y) && isWriter(ws, y)
             && validConnection(request.resource.data, connId)
@@ -263,7 +265,7 @@ service cloud.firestore {
 
         // ── 연결 확인(승인): 관련 학년의 대표만, 현재 연결·카드 버전과 일치할 때만
         match /approvals/{aid} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create, update: if prepAdmin(ws, y) || (
             isEditing(ws, y)
             && aid == request.resource.data.connectionId + '__g' + string(request.resource.data.grade)
@@ -289,7 +291,7 @@ service cloud.firestore {
 
         // ── 주제별 독립 운영·추가 확인 판단. 확인(confirm)은 해당 학년 대표만.
         match /reviews/{rid} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create, update: if prepAdmin(ws, y) || (
             isEditing(ws, y)
             && request.resource.data.decision in ['independent', 'needsCheck']
@@ -318,7 +320,7 @@ service cloud.firestore {
 
         // ── 제안: 제출만으로 카드는 바뀌지 않는다(별도 문서).
         match /proposals/{pid} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create: if prepAdmin(ws, y) || (
             isEditing(ws, y) && isWriter(ws, y)
             && request.resource.data.status == 'discussing'
@@ -343,7 +345,7 @@ service cloud.firestore {
 
         // ── 의견: 작성만 가능(본문 변경과 분리). 확정본에는 추가 불가.
         match /discussions/{did} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create: if prepAdmin(ws, y) || (
             isEditing(ws, y) && isWriter(ws, y)
             && request.resource.data.authorUid == uid()
@@ -356,7 +358,7 @@ service cloud.firestore {
 
         // ── 중복 후보를 '별도 활동'으로 확인한 기록
         match /dupDecisions/{pid} {
-          allow read: if isMember(ws);
+          allow read: if canReadYear(ws, y);
           allow create, update: if prepAdmin(ws, y) || (
             isEditing(ws, y) && canEditGrade(ws, y, request.resource.data.grade)
             && cardOf(ws, y, request.resource.data.cardA).grade == request.resource.data.grade

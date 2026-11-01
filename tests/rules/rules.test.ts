@@ -298,3 +298,14 @@ describe('독립 운영 판단·학년 정비·제안', () => {
     }));
   });
 });
+
+describe('준비 중 작업본 비공개 (A13)', () => {
+  it('준비 중 작업본 내용은 관리자만 읽는다', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'workspaces', WS, 'years', Y), { status: 'preparing' });
+    });
+    await assertFails(getDocs(collection(as('lead3'), yp('cards'))));
+    await assertFails(getDoc(doc(as('viewer'), yp('connections', 'x'))));
+    await assertSucceeds(getDocs(collection(as('admin'), yp('cards'))));
+  });
+});

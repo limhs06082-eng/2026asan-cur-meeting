@@ -39,7 +39,8 @@ const LS_KEY = 'asan.yearId';
 function readLS(): string | null { try { return localStorage.getItem(LS_KEY); } catch { return null; } }
 function writeLS(v: string) { try { localStorage.setItem(LS_KEY, v); } catch { /* 저장 불가 환경 */ } }
 
-export function YearDataProvider({ children }: { children: ReactNode }) {
+/** includePreparing: 준비 중 작업본을 목록에 보일지(관리자만). 준비 중 내용은 보안 규칙상 관리자만 읽을 수 있다. */
+export function YearDataProvider({ children, includePreparing }: { children: ReactNode; includePreparing: boolean }) {
   const [years, setYears] = useState<YearDoc[]>([]);
   const [yearsLoaded, setYearsLoaded] = useState(false);
   const [yearId, setYearIdState] = useState<string | null>(readLS());
@@ -58,10 +59,10 @@ export function YearDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => onSnapshot(collection(db, 'workspaces', WORKSPACE_ID, 'years'), (s) => {
-    const list = s.docs.map((d) => ({ id: d.id, ...d.data() }) as YearDoc).sort((a, b) => b.label - a.label || b.revision - a.revision || a.id.localeCompare(b.id));
+    const list = s.docs.map((d) => ({ id: d.id, ...d.data() }) as YearDoc).filter((y) => includePreparing || y.status !== 'preparing').sort((a, b) => b.label - a.label || b.revision - a.revision || a.id.localeCompare(b.id));
     setYears(list);
     setYearsLoaded(true);
-  }, (e) => setError(e.message)), []);
+  }, (e) => setError(e.message)), [includePreparing]);
 
   // 저장된 선택이 없거나 사라졌으면 편집 중인 최신 작업본을 고른다
   useEffect(() => {

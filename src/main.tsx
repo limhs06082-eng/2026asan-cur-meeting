@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { SessionProvider } from './lib/session';
 import './styles.css';
 import { USE_EMULATOR, auth } from './lib/firebase';
@@ -10,8 +11,10 @@ if (USE_EMULATOR) void import('./lib/repo').then((repo) => Object.assign(window,
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SessionProvider>
-      <App />
-    </SessionProvider>
+    <ErrorBoundary>
+      <SessionProvider>
+        <App />
+      </SessionProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

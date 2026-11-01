@@ -1,6 +1,6 @@
 // 로그인과 구성원 승인 상태. Google 로그인만으로는 자료에 접근할 수 없고, 관리자가 승인한 구성원만 들어온다.
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, type User } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db } from './firebase';
 import { memberRef } from './repo';
@@ -26,7 +26,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     // 본인 구성원 문서는 본인이 읽을 수 있다. 없으면 승인 대기.
-    return onSnapshot(memberRef(user.uid), (s) => setMember(s.exists() ? (s.data() as Member) : null), () => setMember(null));
+    // 캐시에서 온 '문서 없음'은 판단하지 않고 서버 응답을 기다린다(느린 네트워크에서 승인된 교사가 '승인 대기'로 보이지 않게).
+    return onSnapshot(memberRef(user.uid), { includeMetadataChanges: true }, (s) => {
+      if (!s.exists() && s.metadata.fromCache) return;
+      setMember(s.exists() ? (s.data() as Member) : null);
+    }, () => setMember(null));
   }, [user]);
 
   const state: AuthState = useMemo(() => {
@@ -39,7 +43,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     state,
-    signIn: async () => { await signInWithPopup(auth, googleProvider); },
+    signIn: async () => {
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (e) {
+        // 팝업이 막힌 브라우저에서는 전체 화면 이동 방식으로 다시 시도한다
+        const code = (e as { code?: string }).code || '';
+        if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') await signInWithRedirect(auth, googleProvider);
+        else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') throw e;
+      }
+    },
     logout: async () => {
       // 로그아웃 시 화면·메모리 상태 정리: 페이지를 새로 불러 구독과 캐시를 모두 비운다.
       await signOut(auth);

@@ -62,7 +62,7 @@ export function FilterBar({ count }: { count: number }) {
       </span>
       <label className="check"><input type="checkbox" checked={f.showExcluded} onChange={(e) => set({ showExcluded: e.target.checked })} /> 제외 활동 보기</label>
       {active ? <button className="btn tiny ghost" onClick={() => setFilters(defaultFilters)}>필터 지우기</button> : null}
-      <span className="muted">{count}개 · {f.topic ? `‘${f.topic}’ 주제 기준 상태` : '전체 기준 상태'}</span>
+      <span className="muted" title="주제 기준 상태에는 그 주제로 지정한 연결과 판단만 반영됩니다. 주제를 지정하지 않은 연결은 전체 기준에서만 집계됩니다.">{count}개 · {f.topic ? `‘${f.topic}’ 주제 기준 상태 ⓘ` : '전체 기준 상태'}</span>
     </div>
   );
 }

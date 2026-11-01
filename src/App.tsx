@@ -3,7 +3,8 @@ import { useSession } from './lib/session';
 import { YearDataProvider, useYear } from './lib/data';
 import { AppCtx, defaultFilters, type AppState, type Filters, type View } from './lib/app';
 import { makePerm, roleSummary } from './lib/perm';
-import { bootstrapSelfAdmin, submitAccessRequest } from './lib/repo';
+import { bootstrapSelfAdmin, submitAccessRequest, requestRef } from './lib/repo';
+import { onSnapshot } from 'firebase/firestore';
 import { USE_EMULATOR } from './lib/firebase';
 import { Board } from './views/Board';
 import { ListView, ConnectionsView } from './views/Lists';
@@ -23,7 +24,7 @@ const BOOTSTRAP_EMAIL = 'limhs06082@gmail.com';
 export default function App() {
   const { state, signIn, logout } = useSession();
   const [err, setErr] = useState('');
-  if (state.status === 'loading') return <div className="center-screen">불러오는 중…</div>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'signedOut') {
     return (
       <div className="center-screen login">
@@ -40,7 +41,7 @@ export default function App() {
   return (
     <ToastProvider>
       <GlobalSaveProvider>
-        <YearDataProvider>
+        <YearDataProvider includePreparing={state.member.roles.includes('admin')}>
           <Shell onLogout={logout} />
         </YearDataProvider>
       </GlobalSaveProvider>
@@ -48,9 +49,23 @@ export default function App() {
   );
 }
 
+/** 오래 걸리면 연결 확인 안내를 덧붙인다 */
+function Loading() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSlow(true), 8000); return () => clearTimeout(t); }, []);
+  return (
+    <div className="center-screen">
+      <p>불러오는 중…</p>
+      {slow ? <p className="warn-text small">서버 응답이 늦습니다. 인터넷 연결을 확인하고, 계속되면 새로고침하세요.</p> : null}
+    </div>
+  );
+}
+
 function Pending({ email, name, uid, inactive, onLogout }: { email: string; name: string; uid: string; inactive: boolean; onLogout: () => void }) {
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
+  // 이미 보낸 요청이 있으면 다시 보이지 않게 한다(본인 요청 문서만 읽을 수 있음)
+  useEffect(() => onSnapshot(requestRef(uid), (s) => { if (s.exists()) setSent(true); }, () => {}), [uid]);
   const [err, setErr] = useState('');
   return (
     <div className="center-screen">

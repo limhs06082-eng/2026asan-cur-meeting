@@ -96,6 +96,8 @@ export function CardEditor({ cardId, grade, category, proposalId, onClose }: { c
     if (!original && !draft.addReason.trim()) p.push('새 활동을 추가하는 이유를 적어 주세요.');
     if (isPlanYear && draft.changeType && draft.changeType !== 'keep' && !draft.changeReason.trim()) p.push('유지가 아닌 변경에는 변경 이유를 적어 주세요.');
     if (proposal && !decision.trim()) p.push('제안 수용 이유를 적어 주세요.');
+    // 학년이 바뀌면 연결의 학년 정보·학년 확인이 어긋나므로, 살아 있는 연결이 있으면 먼저 정리하게 한다
+    if (original && draft.grade !== original.grade && y.connections.some((c) => !c.deletedAt && (c.fromCardId === original.id || c.toCardId === original.id))) p.push('연결이 있는 카드는 학년을 바꿀 수 없습니다. 연결을 먼저 취소한 뒤 학년을 바꾸고 다시 연결하세요.');
     setProblems(p);
     if (p.length) return;
     const ok = await saver.run((op) => {
