@@ -449,6 +449,23 @@ export async function removeConnection(y: string, actor: Actor, opId: string, co
   });
 }
 
+/** 학교 공통 카드와 여러 학년 카드를 '공통 운영'으로 한꺼번에 잇는다(학년마다 별도 트랜잭션, 이미 있으면 건너뜀). */
+export async function createCommonConnections(y: string, actor: Actor, opBase: string, hub: Card, targets: Card[], text: { reason: string; commonGoal: string; gradeScope: string; topicId: string }): Promise<{ made: number; skipped: number; failed: string[] }> {
+  let made = 0;
+  let skipped = 0;
+  const failed: string[] = [];
+  for (const t of targets) {
+    const r = await createConnection(y, actor, `${opBase}_${t.id}`, {
+      type: 'common', fromCardId: hub.id, toCardId: t.id, topicId: text.topicId, reason: text.reason, inheritedLearning: '', deepenedLearning: '', skipReason: '',
+      rolesByGrade: {}, sharedResult: '', commonGoal: text.commonGoal, gradeScope: text.gradeScope,
+    });
+    if (r.ok) made++;
+    else if (r.kind === 'conflict') skipped++; // 같은 연결이 이미 있음
+    else failed.push(`${t.title}: ${r.message}`);
+  }
+  return { made, skipped, failed };
+}
+
 /** 학년 대표의 연결 확인. 현재 연결 버전과 양 끝 카드 내용 버전을 함께 기록한다. */
 export async function setApproval(y: string, actor: Actor, opId: string, conn: Connection, grade: number, on: boolean, seen?: { from: number; to: number }): Promise<SaveOutcome<Connection>> {
   return runOp<Connection>(y, opId, async (tx) => {

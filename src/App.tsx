@@ -107,7 +107,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const { state } = useSession();
   const member = state.status === 'member' ? state.member : null!;
   const y = useYear();
-  const [view, setView] = useState<View>(() => (location.hash.slice(1) as View) || 'board');
+  const [view, setView] = useState<View>(() => { const v = location.hash.slice(1) as View; return VIEWS.some((x) => x.id === v) ? v : 'board'; });
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
@@ -119,7 +119,14 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const newVersion = useNewVersion();
   const actor = useMemo(() => ({ uid: member.uid, name: member.displayName || member.email, isAdmin: perm.isAdmin }), [member, perm.isAdmin]);
 
-  useEffect(() => { history.replaceState(null, '', `#${view}`); }, [view]);
+  useEffect(() => { if (location.hash.slice(1) !== view) history.pushState(null, '', `#${view}`); }, [view]);
+  // 브라우저 뒤로 가기·주소 변경으로 화면 이동
+  useEffect(() => {
+    const onHash = () => { const v = location.hash.slice(1) as View; if (VIEWS.some((x) => x.id === v)) setView(v); };
+    window.addEventListener('hashchange', onHash);
+    window.addEventListener('popstate', onHash);
+    return () => { window.removeEventListener('hashchange', onHash); window.removeEventListener('popstate', onHash); };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && connectFrom) setConnectFrom(null); };
     window.addEventListener('keydown', onKey);

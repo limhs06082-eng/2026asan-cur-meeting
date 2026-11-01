@@ -232,6 +232,8 @@ details summary { cursor: pointer; color: var(--blue); margin: 6px 0; }
 .save-msg { font-weight: normal; max-width: 520px; }
 .picker { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .picker select { width: 100%; }
+.pick-list { max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.purposes .box { margin: 0 0 8px; }
 .picker-label { font-size: 0.88rem; }
 .toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 200; }
 .toast { background: #22302a; color: #fff; padding: 8px 14px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); max-width: 90vw; }

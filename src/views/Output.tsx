@@ -67,6 +67,7 @@ export function Output() {
           <label className="check"><input type="checkbox" checked={useFilter} onChange={(e) => setUseFilter(e.target.checked)} /> 현재 보드 필터 적용</label>
           <button className="btn primary" disabled={!ready} onClick={make}>{snap ? '스냅샷 다시 만들기' : '출력 화면 만들기'}</button>
           {snap ? <button className="btn" onClick={() => window.print()}>인쇄 / PDF로 저장</button> : null}
+          {snap ? <button className="btn" onClick={() => downloadCsv(snap)} title="한글·엑셀에서 편집할 수 있는 표 파일(계정 정보 없음)">카드·연결 CSV 내려받기</button> : null}
         </div>
         {!ready ? <p className="warn-text">서버와 동기화가 확인되지 않아(캐시 상태) 출력을 만들 수 없습니다. 연결 상태를 확인하세요.</p> : null}
         <p className="muted small">출력은 만든 시점의 읽기 전용 스냅샷입니다. 브라우저 인쇄 창에서 ‘PDF로 저장’을 고르면 PDF 파일이 됩니다(용지: A3 가로 또는 A4, 배율 ‘기본’, 배경 그래픽 켬 권장). 직접 PDF 내려받기는 한글 글꼴 검증 전이라 제공하지 않습니다.</p>
@@ -75,6 +76,35 @@ export function Output() {
       {snap ? (mode === 'notes' ? <Notes s={snap} /> : mode === 'cards' ? <CardList s={snap} /> : <Glance s={snap} split={mode === 'a4'} usePurpose={usePurpose} />) : <p className="muted no-print">‘출력 화면 만들기’를 누르면 미리보기가 나옵니다.</p>}
     </div>
   );
+}
+
+/** 외부 편집용 CSV(엑셀·한글에서 열기). 계정 정보(이메일·uid)는 넣지 않는다. */
+function downloadCsv(s: Snap) {
+  const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const catName = (id: string) => s.year.categories.find((c) => c.id === id)?.name || id;
+  const cards = s.cards.filter(isLive).sort(compareCards);
+  const rows = [['학년', '대표 영역', '활동명', '배움의 목적', '영역 태그', '주제', '배움·자람·나눔', '변경 유형', '변경 이유', '운영 시기', '실제 편성 영역', '학년 사실 확인']];
+  for (const c of cards) {
+    const k = s.idx.checks.get(c.id);
+    rows.push([gradeLabel(c.grade), catName(c.primaryCategory), c.title, c.learningPurpose, c.categories.map(catName).join('; '), c.topics.join('; '), c.focusTags.join('; '),
+      c.changeType ? CHANGE_LABEL[c.changeType] : '', c.changeReason, c.planningDetails?.period || '', c.planningDetails?.actualArea || '',
+      c.grade === 0 ? '-' : k && !k.revokedAt && k.contentVersion === c.contentVersion ? '확인' : '미확인']);
+  }
+  rows.push([]);
+  rows.push(['연결 종류', '시작 활동', '도착 활동', '연결 이유', '이어받을 배움', '깊어지는 배움', '학년별 역할·공통 목표', '상태']);
+  const name = (id: string) => { const c = s.idx.cards.get(id); return c ? `${gradeLabel(c.grade)} ${c.title}` : ''; };
+  for (const c of s.idx.connections.filter((x) => !x.deletedAt)) {
+    rows.push([CONNECTION_TYPES[c.type].label, name(c.fromCardId), name(c.toCardId), c.reason, c.inheritedLearning, c.deepenedLearning,
+      c.type === 'joint' ? Object.entries(c.rolesByGrade).map(([k, v]) => `${k.slice(1)}학년: ${v}`).join(' / ') + ` · 결과: ${c.sharedResult}` : c.type === 'common' ? `${c.commonGoal} · 범위: ${c.gradeScope}` : '',
+      CONN_STATE_LABEL[connectionState(c, s.idx).state]]);
+  }
+  // 엑셀이 한글을 바로 읽도록 BOM을 붙인다
+  const csv = '\uFEFF' + rows.map((r) => r.map(esc).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `${s.year.id}-카드연결-${s.at.toISOString().slice(0, 10)}${s.year.status === 'final' ? '' : '-초안'}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
 function Header({ s, title }: { s: Snap; title: string }) {

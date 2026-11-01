@@ -5,12 +5,12 @@ import {
   CONNECTION_TYPES, CONN_STATE_LABEL, cardStatus, connectionState, gradeLabel, isCardChecked, isReviewConfirmed, duplicateCandidates, GRADES, reviewId,
 } from '../lib/domain';
 import {
-  excludeCard, restoreCard, setCardCheck, saveReview, confirmReview, mergeCards, markDistinct, splitCommonCard, revertCardFields,
+  excludeCard, restoreCard, setCardCheck, saveReview, confirmReview, mergeCards, markDistinct, splitCommonCard, revertCardFields, createCommonConnections,
 } from '../lib/repo';
 import type { Card, EventDoc, Review, ReviewDecision } from '../lib/types';
 import { StatusBadge, CHANGE_LABEL } from './CardChip';
 import { Comments, History } from './Shared';
-import { ReasonDialog, useQuickOp, fmtTime, Modal } from './ui';
+import { ReasonDialog, useQuickOp, fmtTime, Modal, useToast } from './ui';
 
 const PLAN_LABEL: Record<string, string> = {
   period: '운영 시기', target: '대상', partnerGrades: '협력 학년', actualArea: '실제 편성 영역', subjects: '교과', standards: '성취기준',
@@ -27,7 +27,7 @@ export function CardDetail({ card }: { card: Card }) {
   const stAll = cardStatus(idx, card, '');
   const catName = (id: string) => year?.categories.find((c) => c.id === id)?.name || id;
   const canEdit = app.perm.canEditGrade(card.grade);
-  const [dialog, setDialog] = useState<null | 'exclude' | 'restore' | 'split' | { merge: Card } | { distinct: Card } | { review: string }>(null);
+  const [dialog, setDialog] = useState<null | 'exclude' | 'restore' | 'split' | 'common' | { merge: Card } | { distinct: Card } | { review: string }>(null);
   const [revertEvent, setRevertEvent] = useState<EventDoc | null>(null);
 
   const conns = useMemo(() => y.connections.filter((c) => c.fromCardId === card.id || c.toCardId === card.id), [y.connections, card.id]);
@@ -64,6 +64,7 @@ export function CardDetail({ card }: { card: Card }) {
         {canEdit && !card.deletedAt ? <button className="btn danger-outline" onClick={() => setDialog('exclude')}>활동 제외</button> : null}
         {canEdit && card.deletedAt && !card.mergedInto ? <button className="btn" onClick={() => setDialog('restore')}>복원</button> : null}
         {card.grade === 0 && app.perm.editable && (app.perm.isAdmin || app.perm.isPlanner) && !card.deletedAt ? <button className="btn" onClick={() => setDialog('split')}>학년별 카드로 나누기</button> : null}
+        {card.grade === 0 && app.perm.canWrite && !card.deletedAt ? <button className="btn" onClick={() => setDialog('common')} title="여러 학년 카드와 공통 운영 연결을 한 번에 만듭니다">학년 카드와 공통 운영 연결</button> : null}
       </div>
 
       <section className="box">
@@ -194,6 +195,7 @@ export function CardDetail({ card }: { card: Card }) {
       {dialog === 'restore' ? <ReasonDialog title="활동 복원" label="복원 이유 (새 버전으로 저장되며 이전 확인은 되살아나지 않습니다)" confirmText="복원" onCancel={() => setDialog(null)}
         onConfirm={(r) => quick((op) => restoreCard(yid, app.actor, op, card, r), '활동을 복원했습니다')} /> : null}
       {dialog === 'split' ? <SplitDialog card={card} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'common' ? <CommonLinkDialog card={card} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === 'object' && 'merge' in dialog ? (
         <ReasonDialog title={`‘${dialog.merge.title}’을(를) ‘${card.title}’에 합치기`} label="통합 이유 (원문 출현 위치와 카드 ID 추적 정보는 남깁니다)" confirmText="합치기" onCancel={() => setDialog(null)}
           onConfirm={(r) => quick((op) => mergeCards(yid, app.actor, op, card, dialog.merge, r), '카드를 통합했습니다')} />
@@ -258,6 +260,46 @@ function ReviewDialog({ card, topic, onClose }: { card: Card; topic: string; onC
       </fieldset>
       <label className="field"><span>이유 *</span><textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={2000} /></label>
       {existing?.confirm ? <p className="warn-text small">내용을 바꾸면 기존 학년 대표 확인은 무효가 되어 다시 확인을 받아야 합니다.</p> : null}
+    </Modal>
+  );
+}
+
+/** 학교 공통 카드(허브)와 학년 카드들을 '공통 운영'으로 잇는다. 학년 쌍마다 따로 만들 필요가 없다. */
+function CommonLinkDialog({ card, onClose }: { card: Card; onClose: () => void }) {
+  const app = useApp();
+  const y = useYear();
+  const toast = useToast();
+  const candidates = y.cards.filter((c) => c.grade > 0 && !c.deletedAt).sort((a, b) => a.grade - b.grade);
+  const group = candidates.filter((c) => c.commonGroupId === card.id);
+  const [sel, setSel] = useState<string[]>(group.map((c) => c.id));
+  const [q, setQ] = useState('');
+  const [t, setT] = useState({ reason: '', commonGoal: '', gradeScope: '', topicId: '' });
+  const [busy, setBusy] = useState(false);
+  const shown = candidates.filter((c) => sel.includes(c.id) || !q || `${c.grade}학년 ${c.title}`.includes(q));
+  return (
+    <Modal wide title={`공통 운영 연결 — ${card.title}`} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>취소</button>
+      <button className="btn primary" disabled={busy || !sel.length || !t.reason.trim() || !t.commonGoal.trim() || !t.gradeScope.trim()} onClick={async () => {
+        setBusy(true);
+        const r = await createCommonConnections(y.yearId!, app.actor, `op_common_${Date.now().toString(36)}`, card, candidates.filter((c) => sel.includes(c.id)), t);
+        setBusy(false);
+        toast(`공통 운영 연결 ${r.made}개 만듦${r.skipped ? ` · 이미 있던 ${r.skipped}개 건너뜀` : ''}${r.failed.length ? ` · 실패 ${r.failed.length}개: ${r.failed[0]}` : ''}`, r.failed.length ? 'warn' : 'ok');
+        if (!r.failed.length) onClose();
+      }}>{sel.length}개 학년 카드와 연결</button>
+    </>}>
+      <p className="muted small">공통 운영은 학교 공통 카드와 각 학년 카드를 잇는 방식으로 기록합니다. 연결마다 그 학년 대표와 기획팀(공통 카드 쪽)이 확인하면 합의가 됩니다.</p>
+      <div className="form-grid">
+        <label className="field"><span>왜 함께 운영하는가 *</span><textarea rows={2} value={t.reason} onChange={(e) => setT({ ...t, reason: e.target.value })} /></label>
+        <label className="field"><span>공통 목표 *</span><textarea rows={2} value={t.commonGoal} onChange={(e) => setT({ ...t, commonGoal: e.target.value })} /></label>
+        <label className="field"><span>학년별로 달리 운영할 범위 *</span><textarea rows={2} value={t.gradeScope} onChange={(e) => setT({ ...t, gradeScope: e.target.value })} /></label>
+        <label className="field"><span>검토 주제(선택)</span><select value={t.topicId} onChange={(e) => setT({ ...t, topicId: e.target.value })}><option value="">주제 미지정</option>{(y.year?.topics || []).map((x) => <option key={x}>{x}</option>)}</select></label>
+      </div>
+      <fieldset className="field"><legend>연결할 학년 카드 ({sel.length}개 선택)</legend>
+        <input type="search" placeholder="학년·활동명으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="pick-list">
+          {shown.map((c) => <label key={c.id} className="check"><input type="checkbox" checked={sel.includes(c.id)} onChange={(e) => setSel(e.target.checked ? [...sel, c.id] : sel.filter((x) => x !== c.id))} /> {gradeLabel(c.grade)} {c.title}{c.commonGroupId === card.id ? ' (나눈 카드)' : ''}</label>)}
+        </div>
+      </fieldset>
     </Modal>
   );
 }
