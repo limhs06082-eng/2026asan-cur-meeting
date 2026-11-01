@@ -4,7 +4,7 @@ import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { applyFilters } from '../components/Filters';
 import {
-  CONNECTION_TYPES, GRADES, buildIndex, connectionState, gradeLabel, isLive, isReviewConfirmed, unresolvedSummary, CONN_STATE_LABEL, type Index,
+  CONNECTION_TYPES, GRADES, buildIndex, compareCards, connectionState, gradeLabel, isLive, isReviewConfirmed, unresolvedSummary, CONN_STATE_LABEL, type Index,
 } from '../lib/domain';
 import type { Card, Category, YearDoc, Proposal } from '../lib/types';
 import { CHANGE_LABEL } from '../components/CardChip';
@@ -87,7 +87,7 @@ function Header({ s, title }: { s: Snap; title: string }) {
 }
 
 function activeCards(s: Snap) {
-  return s.cards.filter((c) => isLive(c) && c.changeType !== 'end');
+  return s.cards.filter((c) => isLive(c) && c.changeType !== 'end').sort(compareCards);
 }
 
 function GlanceTable({ s, grades, usePurpose, cats }: { s: Snap; grades: number[]; usePurpose: boolean; cats: Category[] }) {
@@ -102,7 +102,7 @@ function GlanceTable({ s, grades, usePurpose, cats }: { s: Snap; grades: number[
       <thead><tr><th className="g-cat">구분</th>{grades.map((g) => <th key={g}>{gradeLabel(g)}</th>)}</tr></thead>
       <tbody>
         {common.length ? (
-          <tr><th className="g-cat">학교 공통</th><td colSpan={grades.length} className="g-common">{common.map((c) => <span key={c.id} className="g-item inline">▪ {c.title}</span>)}</td></tr>
+          <tr><th className="g-cat">학교 공통</th><td colSpan={grades.length} className="g-common">{common.map((c) => { const split = cards.filter((x) => x.commonGroupId === c.id && x.grade > 0).map((x) => x.grade); return <span key={c.id} className="g-item inline">▪ {c.title}{split.length ? <span className="g-ref"> ({split.sort().join('·')}학년 운영)</span> : null}</span>; })}</td></tr>
         ) : null}
         {rows.map((cat) => {
           const any = grades.some((g) => inRow(cat.id, g).length || refsIn(cat.id, g).length);

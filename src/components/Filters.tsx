@@ -1,6 +1,6 @@
 import { useApp, defaultFilters } from '../lib/app';
 import { useYear } from '../lib/data';
-import { GRADES, CARD_STATE, cardStatus, isLive, type CardStatus } from '../lib/domain';
+import { GRADES, CARD_STATE, cardStatus, isLive, compareCards, type CardStatus } from '../lib/domain';
 import type { Card } from '../lib/types';
 import type { Filters } from '../lib/app';
 import type { Index } from '../lib/domain';
@@ -8,7 +8,7 @@ import type { Index } from '../lib/domain';
 export function applyFilters(cards: Card[], f: Filters, idx: Index): Array<{ card: Card; st: CardStatus }> {
   const q = f.search.trim().toLowerCase();
   const out: Array<{ card: Card; st: CardStatus }> = [];
-  for (const card of cards) {
+  for (const card of [...cards].sort(compareCards)) {
     if (!f.showExcluded && !isLive(card)) continue;
     if (f.grades.length && !f.grades.includes(card.grade) && card.grade !== 0) continue;
     if (f.category && !card.categories.includes(f.category) && card.primaryCategory !== f.category) continue;

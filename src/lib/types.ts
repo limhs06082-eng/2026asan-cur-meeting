@@ -225,6 +225,7 @@ export interface Proposal {
   decidedByName: string;
   handover: boolean; // 다음 학년도 전달
   appliedCardVersion: number | null;
+  appliedCardId?: string;
   version: number;
   createdBy: string;
   createdByName: string;

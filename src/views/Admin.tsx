@@ -259,10 +259,42 @@ function Members() {
           </tr>
         ))}</tbody>
       </table>
+      <CopyScopes members={members} label={label} />
       {editing ? <MemberDialog m={editing} label={label} onClose={() => setEditing(null)} onSave={async (m) => {
         const r = await saveMember(app.actor, m);
         if (r.ok) { toast('권한을 저장했습니다 · 서버 저장 확인'); setEditing(null); } else toast(r.message, 'warn');
       }} /> : null}
+    </div>
+  );
+}
+
+/** 새 학년도 담당을 정할 때 출발점으로 이전 학년도 담당을 복사한다(이미 정해진 사람은 건너뜀). 이후 개별 수정한다. */
+function CopyScopes({ members, label }: { members: Member[]; label: number }) {
+  const app = useApp();
+  const toast = useToast();
+  const [from, setFrom] = useState(label - 1);
+  const [to, setTo] = useState(label);
+  const [busy, setBusy] = useState(false);
+  const targets = members.filter((m) => m.active && m.scopes?.[`y${from}`] && !m.scopes?.[`y${to}`]);
+  return (
+    <div className="box">
+      <h3>학년도 담당 복사</h3>
+      <p className="muted small">새 학년도 담당 학년은 사람마다 다를 수 있습니다. 복사는 출발점일 뿐이며, 복사 후 ‘권한 수정’에서 고치세요. 이미 해당 학년도 담당이 있는 사람은 건너뜁니다.</p>
+      <div className="row-wrap">
+        <select value={from} onChange={(e) => setFrom(Number(e.target.value))}>{[label - 1, label, label + 1].map((l) => <option key={l} value={l}>{l}학년도</option>)}</select> →
+        <select value={to} onChange={(e) => setTo(Number(e.target.value))}>{[label, label + 1, label + 2].map((l) => <option key={l} value={l}>{l}학년도</option>)}</select>
+        <button className="btn" disabled={busy || from === to || targets.length === 0} onClick={async () => {
+          if (!window.confirm(`${targets.length}명의 ${from}학년도 담당을 ${to}학년도로 복사할까요?`)) return;
+          setBusy(true);
+          let ok = 0;
+          for (const m of targets) {
+            const r = await saveMember(app.actor, { ...m, scopes: { ...m.scopes, [`y${to}`]: m.scopes[`y${from}`] } });
+            if (r.ok) ok++;
+          }
+          setBusy(false);
+          toast(`${ok}/${targets.length}명 복사 완료 · 서버 저장 확인`, ok === targets.length ? 'ok' : 'warn');
+        }}>복사 ({targets.length}명)</button>
+      </div>
     </div>
   );
 }

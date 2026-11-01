@@ -1,5 +1,8 @@
 // 전체 보드: 학교 공통 영역 + 영역(행) × 1~6학년(열). 선택한 카드의 연결만 강조하고 전체 선은 그리지 않는다.
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+
+const LS_COMMON = 'asan.commonOpen';
+const readOpen = () => { try { return localStorage.getItem(LS_COMMON) !== '0'; } catch { return true; } };
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { CardChip } from '../components/CardChip';
@@ -15,9 +18,17 @@ export function Board() {
   const { filters: f, selectedCardId, connectFrom } = app;
   const wrapRef = useRef<HTMLDivElement>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [commonOpen, setCommonOpen] = useState(readOpen);
+  const toggleCommon = () => { const v = !commonOpen; setCommonOpen(v); try { localStorage.setItem(LS_COMMON, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
 
   const shown = useMemo(() => applyFilters(cards, f, idx), [cards, f, idx]);
-  const cats = useMemo(() => [...(year?.categories || [])].sort((a, b) => a.order - b.order), [year]);
+  const cats = useMemo(() => {
+    const list = [...(year?.categories || [])].sort((a, b) => a.order - b.order);
+    const known = new Set(list.map((c) => c.id));
+    // 영역 설정에서 빠진 대표 영역의 카드도 보드에서 사라지지 않도록 '기타' 행을 둔다
+    if (cards.some((c) => c.grade > 0 && !known.has(c.primaryCategory))) list.push({ id: '__other', name: '기타(영역 미지정)', order: 999 });
+    return list;
+  }, [year, cards]);
   const catName = useMemo(() => new Map(cats.map((c) => [c.id, c.name])), [cats]);
   const grades = f.grades.length ? f.grades : GRADES;
 
@@ -68,11 +79,12 @@ export function Board() {
   const byCell = useMemo(() => {
     const m = new Map<string, typeof shown>();
     for (const x of shown) {
-      const k = x.card.grade === 0 ? 'common' : `${x.card.primaryCategory}|${x.card.grade}`;
+      const cat = catName.has(x.card.primaryCategory) ? x.card.primaryCategory : '__other';
+      const k = x.card.grade === 0 ? 'common' : `${cat}|${x.card.grade}`;
       m.set(k, [...(m.get(k) || []), x]);
     }
     return m;
-  }, [shown]);
+  }, [shown, catName]);
   // 대표 영역이 아닌 다른 영역 태그는 '참조'로만 표시
   const refs = useMemo(() => {
     const m = new Map<string, Card[]>();
@@ -105,11 +117,12 @@ export function Board() {
       <div className="board-wrap" ref={wrapRef} onScroll={measure}>
         <section className="common-area" aria-label="학교 공통 방향·공통 활동">
           <div className="common-head">
-            <h3>학교 공통 방향·공통 활동</h3>
+            <button className="btn tiny ghost" onClick={toggleCommon} aria-expanded={commonOpen}>{commonOpen ? '▾' : '▸'}</button>
+            <h3>학교 공통 방향·공통 활동 <span className="muted small">({common.length})</span></h3>
             <span className="muted">적용 학년을 확인한 뒤 학년별 카드로 나눌 수 있습니다.</span>
             {canAdd(0) ? <button className="btn tiny" onClick={() => app.openCardEditor({ grade: 0, category: 'common' })}>+ 공통 카드</button> : null}
           </div>
-          <div className="common-cards">{common.map(chip)}</div>
+          {commonOpen ? <div className="common-cards">{common.map(chip)}</div> : null}
         </section>
         <table className="matrix">
           <thead>

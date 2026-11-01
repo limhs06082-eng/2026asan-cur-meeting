@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import {
@@ -154,7 +154,7 @@ export function ConnectionDetail({ conn, onClose }: { conn: Connection; onClose:
       <dl className="kv">
         <dt>연결 이유</dt><dd className="pre">{conn.reason}</dd>
         {conn.type === 'deepen' ? <><dt>이어받을 배움</dt><dd className="pre">{conn.inheritedLearning}</dd><dt>깊어지는 배움</dt><dd className="pre">{conn.deepenedLearning || <span className="warn-text">비어 있음</span>}</dd>{conn.skipReason ? <><dt>건너뛰는 이유</dt><dd>{conn.skipReason}</dd></> : null}</> : null}
-        {conn.type === 'joint' ? <>{Object.entries(conn.rolesByGrade || {}).map(([k, v]) => <><dt key={`d${k}`}>{gradeLabel(Number(k.slice(1)))} 역할</dt><dd key={`v${k}`}>{v}</dd></>)}<dt>함께 확인할 결과</dt><dd>{conn.sharedResult}</dd></> : null}
+        {conn.type === 'joint' ? <>{Object.entries(conn.rolesByGrade || {}).map(([k, v]) => <Fragment key={k}><dt>{gradeLabel(Number(k.slice(1)))} 역할</dt><dd>{v}</dd></Fragment>)}<dt>함께 확인할 결과</dt><dd>{conn.sharedResult}</dd></> : null}
         {conn.type === 'common' ? <><dt>공통 목표</dt><dd>{conn.commonGoal}</dd><dt>학년별 운영 범위</dt><dd>{conn.gradeScope}</dd></> : null}
       </dl>
 

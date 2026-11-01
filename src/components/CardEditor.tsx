@@ -5,7 +5,7 @@ import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { FOCUS_TAGS, type Card, type ChangeType, type FocusTag, type PlanningDetails, type Proposal } from '../lib/types';
 import { blankCardDraft, createCard, updateCard, acceptProposalWithCardEdit, CARD_CONTENT_FIELDS, type CardDraft } from '../lib/repo';
-import { GRADES, gradeLabel, newDocId, validateCardDraft } from '../lib/domain';
+import { GRADES, gradeLabel, newDocId, validateCardDraft, threeWayMerge } from '../lib/domain';
 import { emptyPlanning } from '../seed/buildSeed';
 import { Field, Modal, SaveBadge, useSaver, useToast } from './ui';
 
@@ -23,14 +23,59 @@ const FIELD_LABEL: Record<string, string> = {
 };
 const show = (v: unknown) => (Array.isArray(v) ? v.join(', ') : v && typeof v === 'object' ? Object.values(v as object).filter(Boolean).join(' / ') : String(v ?? ''));
 
+/** 충돌 화면: 나만 바꾼 칸은 내 값, 다른 선생님만 바꾼 칸은 최신 값으로 자동 병합하고, 둘 다 바꾼 칸만 고르게 한다. */
+function ConflictMerge({ base, draft, latest, onResolve, onDiscard }: { base: CardDraft; draft: CardDraft; latest: Card; onResolve: (d: CardDraft) => void; onDiscard: () => void }) {
+  const theirs = toDraft(latest);
+  const r = threeWayMerge(base as unknown as Record<string, unknown>, draft as unknown as Record<string, unknown>, theirs as unknown as Record<string, unknown>, CARD_CONTENT_FIELDS);
+  const [pick, setPick] = useState<Record<string, 'mine' | 'theirs'>>(() => Object.fromEntries(r.conflicts.map((k) => [k, 'mine'])));
+  const val = (o: CardDraft, k: string) => show((o as unknown as Record<string, unknown>)[k]);
+  return (
+    <div className="conflict" role="alert">
+      <h3>⚠ 다른 선생님이 먼저 수정했습니다 (최신 버전 {latest.contentVersion}, {latest.updatedByName})</h3>
+      <p>내 초안은 사라지지 않았습니다. 아래처럼 합친 뒤 내용을 확인하고 다시 저장하세요.</p>
+      <table className="compare">
+        <thead><tr><th>항목</th><th>다른 선생님의 최신 값</th><th>내 초안</th><th>합친 결과</th></tr></thead>
+        <tbody>
+          {r.takenTheirs.map((k) => <tr key={k}><th>{FIELD_LABEL[k]}</th><td>{val(theirs, k)}</td><td className="muted">(바꾸지 않음)</td><td>최신 값 사용</td></tr>)}
+          {r.keptMine.map((k) => <tr key={k}><th>{FIELD_LABEL[k]}</th><td className="muted">(바꾸지 않음)</td><td>{val(draft, k)}</td><td>내 값 유지</td></tr>)}
+          {r.conflicts.map((k) => (
+            <tr key={k} className="conflict-row"><th>{FIELD_LABEL[k]} <span className="warn-text">(둘 다 수정)</span></th><td>{val(theirs, k)}</td><td>{val(draft, k)}</td>
+              <td>
+                <label className="check"><input type="radio" checked={pick[k] === 'theirs'} onChange={() => setPick({ ...pick, [k]: 'theirs' })} /> 최신 값</label>
+                <label className="check"><input type="radio" checked={pick[k] === 'mine'} onChange={() => setPick({ ...pick, [k]: 'mine' })} /> 내 값</label>
+              </td></tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="row-wrap">
+        <button className="btn primary" onClick={() => {
+          const out = { ...(r.merged as unknown as CardDraft) } as unknown as Record<string, unknown>;
+          for (const k of r.conflicts) out[k] = pick[k] === 'theirs' ? (theirs as unknown as Record<string, unknown>)[k] : (draft as unknown as Record<string, unknown>)[k];
+          out.grade = draft.grade;
+          onResolve(out as unknown as CardDraft);
+        }}>합친 내용으로 양식 채우기(확인 후 저장)</button>
+        <button className="btn" onClick={onDiscard}>최신 내용만 불러오기(내 초안 버림)</button>
+      </div>
+    </div>
+  );
+}
+
 export function CardEditor({ cardId, grade, category, proposalId, onClose }: { cardId?: string; grade?: number; category?: string; proposalId?: string; onClose: () => void }) {
   const app = useApp();
   const y = useYear();
   const toast = useToast();
   const original = cardId ? y.idx.cards.get(cardId) : undefined;
   const proposal: Proposal | undefined = proposalId ? y.proposals.find((p) => p.id === proposalId) : undefined;
-  const [draft, setDraft] = useState<CardDraft>(() => (original ? toDraft(original) : blankCardDraft(grade ?? app.perm.editGrades[0] ?? 1, category || '')));
+  const [draft, setDraft] = useState<CardDraft>(() => {
+    if (original) return toDraft(original);
+    const d = blankCardDraft(grade ?? app.perm.editGrades[0] ?? 1, category || '');
+    // '활동 추가' 제안을 수용하며 만드는 카드는 제안 내용을 미리 채운다
+    if (proposal) return { ...d, grade: proposal.grade || d.grade, title: proposal.title.slice(0, 120), addReason: `제안 수용: ${proposal.content}${proposal.reason ? ` (이유: ${proposal.reason})` : ''}`.slice(0, 1000) };
+    return d;
+  });
   const [baseVersion, setBaseVersion] = useState(original?.contentVersion ?? 0);
+  // 양식을 열 때의 내용(3자 병합의 기준)
+  const [base, setBase] = useState<CardDraft>(() => (original ? toDraft(original) : blankCardDraft(0, '')));
   const [note, setNote] = useState('');
   const [decision, setDecision] = useState('');
   const [newId] = useState(() => newDocId('c'));
@@ -54,7 +99,7 @@ export function CardEditor({ cardId, grade, category, proposalId, onClose }: { c
     setProblems(p);
     if (p.length) return;
     const ok = await saver.run((op) => {
-      if (!original) return createCard(y.yearId!, app.actor, op, draft, newId) as never;
+      if (!original) return createCard(y.yearId!, app.actor, op, draft, newId, proposal ? { p: proposal, reason: decision } : undefined) as never;
       if (proposal) return acceptProposalWithCardEdit(y.yearId!, app.actor, op, proposal, original, baseVersion, draft, decision);
       return updateCard(y.yearId!, app.actor, op, original.id, baseVersion, draft, note);
     });
@@ -81,24 +126,9 @@ export function CardEditor({ cardId, grade, category, proposalId, onClose }: { c
       {!y.online ? <div className="alert warn">인터넷 연결이 끊겨 저장할 수 없습니다. 작성 중인 내용은 이 화면에 남아 있습니다.</div> : null}
       {remoteChanged && !latest ? <div className="alert warn">이 양식을 연 뒤 다른 선생님이 카드를 수정했습니다(현재 버전 {live!.contentVersion}). 저장하면 비교 화면이 나옵니다.</div> : null}
       {proposal ? <div className="alert info"><strong>제안:</strong> {proposal.title} — {proposal.content} <div className="muted small">제안자 {proposal.createdByName} · 이유: {proposal.reason}</div></div> : null}
-      {latest ? (
-        <div className="conflict">
-          <h3>⚠ 다른 선생님이 수정했습니다 (최신 버전 {latest.contentVersion}, {latest.updatedByName})</h3>
-          <p>내 초안은 그대로 있습니다. 최신 내용과 비교한 뒤 반영할 내용을 고치고, ‘최신 버전 기준으로 다시 저장’을 누르세요.</p>
-          <table className="compare">
-            <thead><tr><th>항목</th><th>최신 내용(서버)</th><th>내 초안</th></tr></thead>
-            <tbody>
-              {(CARD_CONTENT_FIELDS as readonly string[]).filter((k) => show((latest as unknown as Record<string, unknown>)[k]) !== show((draft as unknown as Record<string, unknown>)[k])).map((k) => (
-                <tr key={k}><th>{FIELD_LABEL[k]}</th><td>{show((latest as unknown as Record<string, unknown>)[k])}</td><td>{show((draft as unknown as Record<string, unknown>)[k])}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="row-wrap">
-            <button className="btn primary" onClick={() => { setBaseVersion(latest.contentVersion); saver.setLatest(null); saver.reset(); saver.markDirty(); }}>최신 버전 기준으로 내 초안 유지(검토 후 저장)</button>
-            <button className="btn" onClick={() => { setDraft(toDraft(latest)); setBaseVersion(latest.contentVersion); saver.setLatest(null); saver.reset(); }}>최신 내용 불러오기(내 초안 버림)</button>
-          </div>
-        </div>
-      ) : null}
+      {latest ? <ConflictMerge base={base} draft={draft} latest={latest} onResolve={(merged) => {
+        setDraft(merged); setBase(toDraft(latest)); setBaseVersion(latest.contentVersion); saver.setLatest(null); saver.reset(); saver.markDirty();
+      }} onDiscard={() => { setDraft(toDraft(latest)); setBase(toDraft(latest)); setBaseVersion(latest.contentVersion); saver.setLatest(null); saver.reset(); }} /> : null}
       {problems.length ? <div className="alert warn"><ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul></div> : null}
 
       <div className="form-grid">

@@ -195,6 +195,7 @@ function SyncStatus() {
   let conn: { cls: string; text: string };
   if (!y.online) conn = { cls: 'warn', text: '오프라인 · 저장·확인 불가' };
   else if (y.sync.error) conn = { cls: 'warn', text: `동기화 오류` };
+  else if (y.yearsLoaded && y.years.length === 0) conn = { cls: 'ok', text: '연결됨' };
   else if (!y.sync.loaded) conn = { cls: 'info', text: '불러오는 중' };
   else if (y.sync.fromCache) conn = { cls: 'warn', text: '연결 불안정 · 서버 확인 전' };
   else conn = { cls: 'ok', text: '실시간 연결됨' };

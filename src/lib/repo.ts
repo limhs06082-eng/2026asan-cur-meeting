@@ -1,7 +1,7 @@
 // 쓰기 계층. 모든 공동 데이터 변경은 트랜잭션으로 처리하고, 변경과 이력(event)을 함께 저장한다.
 // 같은 사용자 작업은 같은 operationId를 재사용하여 재시도해도 이중 등록되지 않는다.
 import {
-  collection, doc, getDocFromServer, getDocsFromServer, runTransaction, serverTimestamp, setDoc,
+  collection, doc, getDocFromServer, getDocsFromServer, runTransaction, serverTimestamp, setDoc, Timestamp,
   type DocumentReference, type Transaction,
 } from 'firebase/firestore';
 import { db, WORKSPACE_ID } from './firebase';
@@ -167,9 +167,17 @@ function normalizeDraft(d: CardDraft): CardContent {
   };
 }
 
-export async function createCard(y: string, actor: Actor, opId: string, d: CardDraft, cardId: string): Promise<SaveOutcome> {
+/** 새 카드. accept가 있으면 '활동 추가' 제안의 수용 처리와 한 트랜잭션으로 함께 저장한다. */
+export async function createCard(y: string, actor: Actor, opId: string, d: CardDraft, cardId: string, accept?: { p: Proposal; reason: string }): Promise<SaveOutcome> {
   return runOp(y, opId, async (tx) => {
     const year = await requireEditing(tx, y);
+    if (accept) {
+      const ps = await tx.get(yearDoc(y, 'proposals', accept.p.id));
+      const cur = ps.data() as Proposal;
+      if (cur.version !== accept.p.version) throw new StateError('제안이 그사이 바뀌었습니다. 다시 열어 주세요.');
+      tx.update(yearDoc(y, 'proposals', accept.p.id), { status: 'accepted', decisionReason: accept.reason.trim(), decidedBy: actor.uid, decidedByName: actor.name, appliedCardVersion: 1, appliedCardId: cardId, version: cur.version + 1, updatedBy: actor.uid, updatedAt: serverTimestamp(), lastOpId: `${opId}_p` });
+      tx.set(yearDoc(y, 'events', `${opId}_p`), eventPayload(`${opId}_p`, actor, { op: 'proposal.accepted', targetColl: 'proposals', targetId: accept.p.id, baseVersion: cur.version, resultingVersion: cur.version + 1, after: { appliedCardId: cardId }, note: accept.reason }));
+    }
     const ref = yearDoc(y, 'cards', cardId);
     const content = normalizeDraft(d);
     const card: Omit<Card, 'id'> = {
@@ -803,12 +811,14 @@ export function validateBackup(b: unknown): { ok: boolean; problems: string[]; c
 }
 
 const tsKeys = ['updatedAt', 'createdAt', 'at', 'deletedAt', 'revokedAt', 'finalizedAt', 'startedAt', 'registeredAt'];
+/** JSON으로 내보낸 Timestamp({seconds,nanoseconds})를 원래 시각 그대로 되살린다. */
 function reviveTimestamps(o: Record<string, unknown>): Record<string, unknown> {
-  // JSON으로 내보낸 Timestamp({seconds,nanoseconds})는 가져올 때 서버 시각으로 대체하지 않고 '가져온 시점'으로 표시한다.
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(o)) {
-    if (tsKeys.includes(k) && v && typeof v === 'object' && 'seconds' in (v as object)) out[k] = serverTimestamp();
-    else if (k === 'confirm' && v && typeof v === 'object') out[k] = reviveTimestamps(v as Record<string, unknown>);
+    if (tsKeys.includes(k) && v && typeof v === 'object' && 'seconds' in (v as object)) {
+      const t = v as { seconds: number; nanoseconds?: number };
+      out[k] = new Timestamp(t.seconds, t.nanoseconds || 0);
+    } else if (k === 'confirm' && v && typeof v === 'object') out[k] = reviveTimestamps(v as Record<string, unknown>);
     else out[k] = v;
   }
   return out;

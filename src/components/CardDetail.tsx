@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import {
@@ -27,7 +27,6 @@ export function CardDetail({ card }: { card: Card }) {
   const stAll = cardStatus(idx, card, '');
   const catName = (id: string) => year?.categories.find((c) => c.id === id)?.name || id;
   const canEdit = app.perm.canEditGrade(card.grade);
-  const isLead = app.perm.isLead(card.grade);
   const [dialog, setDialog] = useState<null | 'exclude' | 'restore' | 'split' | { merge: Card } | { distinct: Card } | { review: string }>(null);
   const [revertEvent, setRevertEvent] = useState<EventDoc | null>(null);
 
@@ -96,7 +95,7 @@ export function CardDetail({ card }: { card: Card }) {
           <dt>주제</dt><dd>{card.topics.length ? card.topics.map((t) => <span key={t} className="pill">{t}</span>) : <span className="muted">없음</span>}</dd>
           <dt>배움·자람·나눔</dt><dd>{card.focusTags.length ? card.focusTags.join(', ') : <span className="muted">표시 없음</span>}</dd>
           {card.changeType ? <><dt>2027 변경</dt><dd><span className={`badge ch-${card.changeType}`}>{CHANGE_LABEL[card.changeType]}</span> {card.changeReason}</dd></> : null}
-          {Object.entries(card.planningDetails || {}).filter(([, v]) => v).map(([k, v]) => <><dt key={`k${k}`}>{PLAN_LABEL[k] || k}</dt><dd key={`v${k}`} className="pre">{String(v)}</dd></>)}
+          {Object.entries(card.planningDetails || {}).filter(([, v]) => v).map(([k, v]) => <Fragment key={k}><dt>{PLAN_LABEL[k] || k}</dt><dd className="pre">{String(v)}</dd></Fragment>)}
           {card.addReason ? <><dt>추가 이유</dt><dd>{card.addReason}</dd></> : null}
         </dl>
         {card.checkFlags.length ? <div className="flags">{card.checkFlags.map((f) => <div key={f} className="flag">⚠ {f}</div>)}</div> : null}
@@ -167,7 +166,6 @@ export function CardDetail({ card }: { card: Card }) {
           </ul>
         ) : null}
         {canEdit && !card.deletedAt ? <button className="btn tiny" onClick={() => setDialog({ review: topic })}>판단 기록하기{topic ? ` (‘${topic}’)` : ''}</button> : null}
-        {!canEdit && isLead ? null : null}
       </section>
 
       {proposals.length ? (

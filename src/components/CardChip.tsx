@@ -40,7 +40,7 @@ function CardChipInner({ card, st, catName, selected, related, dimmed, connectMo
       {showPurpose && card.learningPurpose ? <span className="chip-purpose">{card.learningPurpose}</span> : null}
       <span className="chip-meta">
         <StatusBadge st={st} compact />
-        {st.checked ? <span className="badge st-checked" title="학년 사실 확인 완료(현재 버전)">✓ 확인</span> : <span className="badge st-unchecked" title="학년 미확인">미확인</span>}
+        {card.grade === 0 ? null : st.checked ? <span className="badge st-checked" title="학년 사실 확인 완료(현재 버전)">✓ 확인</span> : <span className="badge st-unchecked" title="학년 미확인">미확인</span>}
         {st.needsCheck ? <span className="badge st-needs" title="추가 확인 필요">⚠ 확인</span> : null}
         {st.openProposals > 0 ? <span className="badge st-prop" title="논의 중 제안">제안 {st.openProposals}</span> : null}
         {card.changeType ? <span className={`badge ch-${card.changeType}`}>{CHANGE_LABEL[card.changeType]}</span> : null}

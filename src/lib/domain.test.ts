@@ -174,3 +174,16 @@ describe('확정 전 미해결', () => {
     expect(u.openConnections).toHaveLength(1);
   });
 });
+
+import { threeWayMerge } from './domain';
+describe('충돌 병합 (A03)', () => {
+  it('서로 다른 칸을 고쳤으면 둘 다 살리고, 같은 칸을 다르게 고쳤으면 충돌로 돌려준다', () => {
+    const base = { title: 'a', learningPurpose: 'p', topics: ['x'] };
+    const mine = { title: 'a2', learningPurpose: 'p', topics: ['x', 'y'] };
+    const theirs = { title: 'a', learningPurpose: 'p2', topics: ['z'] };
+    const r = threeWayMerge(base, mine, theirs, ['title', 'learningPurpose', 'topics']);
+    expect(r.merged.title).toBe('a2');
+    expect(r.merged.learningPurpose).toBe('p2');
+    expect(r.conflicts).toEqual(['topics']);
+  });
+});

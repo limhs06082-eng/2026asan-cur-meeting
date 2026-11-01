@@ -298,6 +298,13 @@ export function similarity(a: string, b: string): number {
   return inter / (A.size + B.size - inter);
 }
 
+const tokens = (t: string) => t.split(/[\s,·()\-&]+/).filter((x) => x.length >= 2);
+/** 짧은 활동명 전체가 긴 활동명의 한 낱말과 같은가(예: ‘소고’ ↔ ‘기악-소고 동아리’) */
+function isTokenOf(short: string, long: string): boolean {
+  const s = short.replace(/\s+/g, '');
+  return s.length >= 2 && s.length < long.replace(/\s+/g, '').length && tokens(long).includes(s);
+}
+
 export interface DupCandidate {
   a: Card;
   b: Card;
@@ -326,6 +333,7 @@ export function duplicateCandidates(idx: Index): DupCandidate[] {
         let why = '';
         if (ca && ca === cb) why = '활동명이 같음';
         else if (ca.length >= 3 && cb.length >= 3 && (ca.includes(cb) || cb.includes(ca))) why = '한 활동명이 다른 활동명을 포함';
+        else if (isTokenOf(a.title, b.title) || isTokenOf(b.title, a.title)) why = '한 활동명이 다른 활동명 안의 낱말과 같음';
         else if (similarity(ca, cb) >= 0.5) why = '활동명이 비슷함';
         if (why) out.push({ a, b, why: `${why} · 영역: ${a.primaryCategory} / ${b.primaryCategory}`, key });
       }
@@ -366,10 +374,15 @@ export function checkQuestions(idx: Index): CheckQuestion[] {
   for (const d of duplicateCandidates(idx)) {
     q.push({ kind: '중복으로 보이는 활동', text: `${gradeLabel(d.a.grade)} ‘${d.a.title}’ 과 ‘${d.b.title}’: 같은 활동인지 별도 활동인지 확인해 주세요. (${d.why})`, targetType: 'card', targetId: d.a.id, grade: d.a.grade });
   }
+  // 목적이 빈 카드는 학년별 한 줄로 묶는다(질문 목록이 넘치지 않게)
+  const noPurpose = new Map<number, Card[]>();
   for (const c of idx.cards.values()) {
     if (!isLive(c)) continue;
-    if (!c.learningPurpose.trim()) q.push({ kind: '배움의 목적 비어 있음', text: `${name(c.id)}: 배움의 목적을 적어야 학년 확인을 할 수 있습니다.`, targetType: 'card', targetId: c.id, grade: c.grade });
+    if (!c.learningPurpose.trim() && c.grade > 0) noPurpose.set(c.grade, [...(noPurpose.get(c.grade) || []), c]);
     for (const f of c.checkFlags) q.push({ kind: '원본 해석 확인', text: `${name(c.id)}: ${f}`, targetType: 'card', targetId: c.id, grade: c.grade });
+  }
+  for (const [g, list] of [...noPurpose.entries()].sort((a, b) => a[0] - b[0])) {
+    q.push({ kind: '배움의 목적 비어 있음', text: `${gradeLabel(g)} 카드 ${list.length}개의 배움의 목적이 비어 있습니다(학년 확인 전에 채워야 함). 예: ${list.slice(0, 3).map((c) => `‘${c.title}’`).join(', ')}${list.length > 3 ? ' 등' : ''}`, targetType: 'card', targetId: list[0].id, grade: g });
   }
   return q;
 }
@@ -426,4 +439,36 @@ export function verifyClone(
     if (!ids.has(c.fromCardId) || !ids.has(c.toCardId)) problems.push(`연결 ${c.id}의 끝 카드가 새 작업본에 없습니다.`);
   }
   return problems;
+}
+
+// ───────────────────────── 충돌 병합 ─────────────────────────
+
+/**
+ * 3자 병합: 양식을 열 때의 값(base), 내 초안(mine), 서버 최신값(theirs).
+ * 나만 바꾼 칸은 내 값, 남만 바꾼 칸은 최신값을 쓰고, 둘 다 다르게 바꾼 칸은 사람이 고르도록 돌려준다.
+ */
+export function threeWayMerge<T extends Record<string, unknown>>(base: T, mine: T, theirs: T, keys: readonly string[]) {
+  const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const merged: Record<string, unknown> = { ...mine };
+  const conflicts: string[] = [];
+  const takenTheirs: string[] = [];
+  const keptMine: string[] = [];
+  for (const k of keys) {
+    const m = !eq(mine[k], base[k]);
+    const t = !eq(theirs[k], base[k]);
+    if (m && t && !eq(mine[k], theirs[k])) conflicts.push(k);
+    else if (t) { merged[k] = theirs[k]; if (!eq(mine[k], theirs[k])) takenTheirs.push(k); }
+    else if (m) keptMine.push(k);
+  }
+  return { merged: merged as T, conflicts, takenTheirs, keptMine };
+}
+
+// ───────────────────────── 정렬 ─────────────────────────
+
+/** 원본 표의 순서(칸·줄)를 따르고, 교사 추가 카드는 그 뒤에 활동명 순으로 둔다. 복제본도 같은 순서를 유지한다. */
+export function compareCards(a: Card, b: Card): number {
+  const oa = a.sourceOccurrences[0];
+  const ob = b.sourceOccurrences[0];
+  const cell = (o?: { gradeCell: string }) => (o ? (o.gradeCell.startsWith('기타') ? 1 : 0) : 2);
+  return a.grade - b.grade || cell(oa) - cell(ob) || (oa?.order ?? 999) - (ob?.order ?? 999) || a.title.localeCompare(b.title, 'ko');
 }

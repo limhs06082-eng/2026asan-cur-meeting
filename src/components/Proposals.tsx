@@ -79,6 +79,7 @@ export function ProposalDetail({ p, onClose }: { p: Proposal; onClose: () => voi
               if (ok) { toast('제안 처리를 저장했습니다 · 서버 저장 확인'); onClose(); }
             }}>처리 저장{status === 'accepted' ? '(카드 변경 없이 수용)' : ''}</button>
             {cardEditable && p.status === 'discussing' ? <button className="btn" onClick={() => { onClose(); app.openCardEditor({ cardId: card!.id, proposalId: p.id }); }}>수용하고 카드 수정하기</button> : null}
+            {p.targetType === 'none' && p.kind === 'add' && p.status === 'discussing' && app.perm.canEditGrade(p.grade) ? <button className="btn" onClick={() => { onClose(); app.openCardEditor({ grade: p.grade, proposalId: p.id }); }}>수용하고 새 카드 만들기</button> : null}
             <SaveBadge status={saver.status} message={saver.message} />
           </div>
           <p className="muted small">‘수용하고 카드 수정하기’는 카드의 현재 버전을 확인한 뒤 실제 수정과 제안 처리 이력을 함께 저장합니다.</p>
