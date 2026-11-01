@@ -5,11 +5,14 @@ const LS_COMMON = 'asan.commonOpen';
 const readOpen = () => { try { return localStorage.getItem(LS_COMMON) !== '0'; } catch { return true; } };
 const LS_TIP = 'asan.tipClosed';
 const readTip = () => { try { return localStorage.getItem(LS_TIP) === '1'; } catch { return false; } };
+// 카드 표시 방식(내 화면에만 적용): 기본은 '간단히' — 활동명과 연결 수만 보여 전체 학년을 한 화면에서 훑어볼 수 있게 한다
+const LS_DETAIL = 'asan.cardDetail';
+const readDetail = () => { try { return localStorage.getItem(LS_DETAIL) === '1'; } catch { return false; } };
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { CardChip } from '../components/CardChip';
 import { FilterBar, applyFilters } from '../components/Filters';
-import { GRADES, CONNECTION_TYPES, connectionState, gradeLabel } from '../lib/domain';
+import { GRADES, CONNECTION_TYPES, CARD_STATE, connectionState, gradeLabel } from '../lib/domain';
 import type { Card, Connection } from '../lib/types';
 
 interface Line { x1: number; y1: number; x2: number; y2: number; conn: Connection; agreed: boolean; dir: boolean }
@@ -24,6 +27,8 @@ export function Board() {
   const [topicLines, setTopicLines] = useState(false);
   const [big, setBig] = useState(false);
   const [tipClosed, setTipClosed] = useState(readTip);
+  const [detail, setDetail] = useState(readDetail);
+  const toggleDetail = () => { const v = !detail; setDetail(v); try { localStorage.setItem(LS_DETAIL, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
   const toggleCommon = () => { const v = !commonOpen; setCommonOpen(v); try { localStorage.setItem(LS_COMMON, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
 
   const shown = useMemo(() => applyFilters(cards, f, idx), [cards, f, idx]);
@@ -89,7 +94,7 @@ export function Board() {
     const onR = () => measure();
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
-  }, [measure, shown]);
+  }, [measure, shown, detail, big, commonOpen]);
 
   const byCell = useMemo(() => {
     const m = new Map<string, typeof shown>();
@@ -114,14 +119,14 @@ export function Board() {
   const chip = (x: (typeof shown)[number]) => (
     <CardChip key={x.card.id} card={x.card} st={x.st} catName="" selected={x.card.id === selectedCardId || x.card.id === connectFrom}
       related={related.ids.has(x.card.id) && x.card.id !== selectedCardId} dimmed={!!selectedCardId && related.ids.size > 0 && !related.ids.has(x.card.id)}
-      connectMode={!!connectFrom} onClick={onCardClick} />
+      connectMode={!!connectFrom} onClick={onCardClick} simple={!detail} />
   );
 
   const common = byCell.get('common') || [];
   const canAdd = (g: number) => app.perm.canEditGrade(g);
 
   return (
-    <div className={`board-page ${big ? 'big' : ''}`}>
+    <div className={`board-page ${big ? 'big' : ''} ${detail ? '' : 'simple'}`}>
       {!tipClosed && app.perm.canWrite ? (
         <div className="tip" role="note">
           처음이라면: <strong>‘내 학년만’</strong> → 카드 누르기 → <strong>카드 수정</strong>(배움의 목적 쓰기) → <strong>실제 운영과 맞음 — 확인</strong> → 이어지는 카드와 <strong>연결 만들기</strong>. 자세한 내용은 ‘사용 안내’.
@@ -130,7 +135,14 @@ export function Board() {
       ) : null}
       <FilterBar count={shown.length} />
       <div className="row-wrap board-tools">
+        <span className="seg" role="group" aria-label="카드 표시">
+          <button className={`btn tiny ${detail ? '' : 'on'}`} aria-pressed={!detail} onClick={() => detail && toggleDetail()} title="활동명과 연결 수만 보여 전체 학년을 한눈에 봅니다. 배움의 목적은 카드에 마우스를 올리면 보입니다.">간단히</button>
+          <button className={`btn tiny ${detail ? 'on' : ''}`} aria-pressed={detail} onClick={() => !detail && toggleDetail()} title="배움의 목적과 확인 상태 표시를 카드에 함께 보여 줍니다.">자세히</button>
+        </span>
         <button className="btn tiny" aria-pressed={big} onClick={() => setBig(!big)} title="전자칠판·화면 공유용으로 글자를 크게 봅니다(내 화면에만 적용)">{big ? '보통 크기' : '크게 보기'}</button>
+        <span className="state-legend muted" aria-label="카드 왼쪽 색 띠의 뜻">
+          {(['agreed', 'independent', 'proposed', 'needsReview'] as const).map((k) => <span key={k} className={`lg s-${k}`}>{CARD_STATE[k].label}</span>)}
+        </span>
       </div>
       {f.topic ? (
         <label className="check topic-lines"><input type="checkbox" checked={topicLines} onChange={(e) => setTopicLines(e.target.checked)} /> ‘{f.topic}’ 주제의 연결선 보기 {topicLines && !selectedCardId ? `(${related.conns.length}개)` : ''}</label>

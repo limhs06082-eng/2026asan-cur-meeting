@@ -23,14 +23,45 @@ interface Props {
   connectMode: boolean;
   onClick: (c: Card) => void;
   showPurpose?: boolean;
+  /** 간단히: 활동명과 연결 수만 보이고, 상태는 왼쪽 색 띠로, 목적·확인 상태는 마우스를 올리면 보인다 */
+  simple?: boolean;
 }
 
-function CardChipInner({ card, st, catName, selected, related, dimmed, connectMode, onClick, showPurpose = true }: Props) {
+function CardChipInner({ card, st, catName, selected, related, dimmed, connectMode, onClick, showPurpose = true, simple = false }: Props) {
   const excluded = !!card.deletedAt;
+  const stateCls = `s-${st.state}`;
+  const changed = card.changeType && card.changeType !== 'keep' ? card.changeType : null;
+  if (simple) {
+    const tip = [
+      card.title,
+      `배움의 목적: ${card.learningPurpose || '(아직 쓰지 않음)'}`,
+      `${CARD_STATE[st.state].label}${card.grade === 0 ? '' : st.checked ? ' · 학년 확인됨' : ' · 학년 미확인'}${st.liveConnections ? ` · 연결 ${st.liveConnections}개(합의 ${st.agreedConnections})` : ''}${st.openProposals ? ` · 제안 ${st.openProposals}` : ''}`,
+    ].join('\n');
+    return (
+      <button
+        type="button"
+        className={`chip simple ${stateCls} ${selected ? 'selected' : ''} ${related ? 'related' : ''} ${dimmed ? 'dimmed' : ''} ${excluded ? 'excluded' : ''} ${card.changeType === 'end' ? 'ended' : ''}`}
+        data-card={card.id}
+        onClick={() => onClick(card)}
+        aria-pressed={selected}
+        title={tip}
+        aria-label={`${card.grade === 0 ? '학교 공통' : card.grade + '학년'} ${card.title}. ${CARD_STATE[st.state].label}${st.checked ? ', 학년 확인됨' : ', 학년 미확인'}${connectMode ? '. 눌러서 연결 대상으로 선택' : ''}`}
+      >
+        <span className="chip-title">{card.title}</span>
+        {st.liveConnections > 0 || changed || excluded ? (
+          <span className="chip-mini">
+            {changed ? <span className={`badge ch-${changed}`}>{CHANGE_LABEL[changed]}</span> : null}
+            {excluded ? <span className="badge st-excluded">제외</span> : null}
+            {st.liveConnections > 0 ? <span className={`mini-conn ${st.agreedConnections === st.liveConnections ? 'all' : ''}`}>연결 {st.liveConnections}</span> : null}
+          </span>
+        ) : null}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
-      className={`chip ${selected ? 'selected' : ''} ${related ? 'related' : ''} ${dimmed ? 'dimmed' : ''} ${excluded ? 'excluded' : ''} ${card.changeType === 'end' ? 'ended' : ''}`}
+      className={`chip ${stateCls} ${selected ? 'selected' : ''} ${related ? 'related' : ''} ${dimmed ? 'dimmed' : ''} ${excluded ? 'excluded' : ''} ${card.changeType === 'end' ? 'ended' : ''}`}
       data-card={card.id}
       onClick={() => onClick(card)}
       aria-pressed={selected}
