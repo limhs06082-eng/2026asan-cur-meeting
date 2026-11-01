@@ -1,7 +1,7 @@
 // 관리자: 작업본(원본 등록·편집 열기·확정·복제·정정본)·백업/복원·영역/주제 설정·구성원 승인
 import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { db, WORKSPACE_ID } from '../lib/firebase';
+import { db, WORKSPACE_ID, PROJECT_ID } from '../lib/firebase';
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import {
@@ -112,6 +112,16 @@ function Years() {
       </table>
       <div className="row-wrap">
         <button className="btn" onClick={() => setImporting(true)}>백업 가져오기(새 작업본으로)</button>
+      </div>
+      <div className="box">
+        <h3>사용량·비용 안내</h3>
+        <p className="small">현재 Firebase 무료(Spark) 요금제입니다. 하루 읽기 50,000건·쓰기 20,000건을 넘으면 요금 대신 <strong>그날 한국 시각 오후 4~5시까지 저장·조회가 막힙니다</strong>. 접속(새로고침) 한 번에 현재 작업본 전체(수백 건)를 읽으므로, 노트북 14대가 자주 새로고침하면 한도에 닿을 수 있습니다.</p>
+        <ul className="small">
+          <li>회의 중에는 화면을 새로고침하지 말고 띄워 둔 채 쓰기를 안내해 주세요(바뀐 것만 읽음).</li>
+          <li>전 교직원 다모임처럼 많이 쓰는 날 전에는 Blaze(종량제) 전환과 예산 알림 설정을 검토하세요. 결제 설정은 운영자가 직접 판단합니다.</li>
+          <li>회의 전후 ‘JSON 백업’을 내려받아 학교 드라이브에 보관하세요.</li>
+        </ul>
+        <p className="small"><a href={`https://console.firebase.google.com/project/${PROJECT_ID}/firestore/usage`} target="_blank" rel="noreferrer">Firebase 콘솔 사용량 보기</a></p>
       </div>
       {busy ? <p className="info-text">⏳ {busy} 진행 중… 창을 닫지 마세요.</p> : null}
       {log ? <pre className="log">{log}</pre> : null}
