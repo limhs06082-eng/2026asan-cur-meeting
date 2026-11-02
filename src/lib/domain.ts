@@ -78,8 +78,6 @@ export function validateConnection(d: ConnectionDraft, from?: Card, to?: Card): 
   if (d.type === 'deepen') {
     if (!d.inheritedLearning.trim()) p.push('앞 카드에서 경험한 것(이어받을 배움)을 적어 주세요.');
     if (!d.deepenedLearning.trim()) p.push('뒤 카드에서 깊어지는 것을 적어 주세요.');
-    if (from && to && Math.abs(to.grade - from.grade) > 1 && from.grade > 0 && to.grade > 0 && !d.skipReason.trim())
-      p.push('학년을 건너뛰는 심화 연결입니다. 건너뛰는 이유를 적어 주세요.');
   }
   if (d.type === 'joint') {
     if (from && to) {
@@ -199,11 +197,12 @@ export function isReviewConfirmed(r: Review, idx: Index): boolean {
 // ───────────────────────── 카드 검토 상태 ─────────────────────────
 
 export type CardState = 'agreed' | 'independent' | 'proposed' | 'needsReview';
+// needsReview는 '아직 연결 없음'일 뿐 해야 할 일로 보이지 않게 이름을 중립으로 둔다(보드에는 표시하지 않음)
 export const CARD_STATE: Record<CardState, { label: string; icon: string; cls: string }> = {
   agreed: { label: '연결 합의', icon: '🔗', cls: 'st-agreed' },
-  independent: { label: '독립 운영 합의', icon: '◇', cls: 'st-independent' },
-  proposed: { label: '연결 제안 있음', icon: '✎', cls: 'st-proposed' },
-  needsReview: { label: '연결 검토 필요', icon: '○', cls: 'st-review' },
+  independent: { label: '독립 운영', icon: '◇', cls: 'st-independent' },
+  proposed: { label: '연결됨(확인 전)', icon: '✎', cls: 'st-proposed' },
+  needsReview: { label: '연결 없음', icon: '', cls: 'st-review' },
 };
 
 export interface CardStatus {
@@ -234,7 +233,7 @@ export function cardStatus(idx: Index, card: Card, topic: string): CardStatus {
   let state: CardState = 'needsReview';
   if (agreed > 0) state = 'agreed';
   else if (independent) state = 'independent';
-  else if (open > 0 || openProposals > 0) state = 'proposed';
+  else if (open > 0) state = 'proposed';
   return {
     state,
     needsCheck: needsCheckReview || card.checkFlags.length > 0,
@@ -244,6 +243,89 @@ export function cardStatus(idx: Index, card: Card, topic: string): CardStatus {
     agreedConnections: agreed,
     openProposals,
   };
+}
+
+// ───────────────────────── 흐름(1~6학년 줄기) ─────────────────────────
+
+/** 양 끝 카드가 모두 살아 있는 연결만(흐름 계산용) */
+function liveConns(idx: Index, topic?: string): Connection[] {
+  return idx.connections.filter((c) => !c.deletedAt && isLive(idx.cards.get(c.fromCardId)) && isLive(idx.cards.get(c.toCardId)) && (topic === undefined || c.topicId === topic));
+}
+
+/**
+ * 선택한 카드에서 연결을 따라 닿는 모든 카드와 연결(앞뒤 학년 전체).
+ * topic이 ''이면 모든 주제, 아니면 그 주제의 연결만 따라간다.
+ */
+export function connectedChain(idx: Index, startId: string, topic: string): { cardIds: Set<string>; conns: Connection[] } {
+  const conns = liveConns(idx, topic || undefined);
+  const adj = new Map<string, Connection[]>();
+  for (const c of conns) {
+    adj.set(c.fromCardId, [...(adj.get(c.fromCardId) || []), c]);
+    adj.set(c.toCardId, [...(adj.get(c.toCardId) || []), c]);
+  }
+  const cardIds = new Set<string>([startId]);
+  const used = new Set<string>();
+  const queue = [startId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const c of adj.get(id) || []) {
+      used.add(c.id);
+      const other = c.fromCardId === id ? c.toCardId : c.fromCardId;
+      if (!cardIds.has(other)) { cardIds.add(other); queue.push(other); }
+    }
+  }
+  return { cardIds, conns: conns.filter((c) => used.has(c.id)) };
+}
+
+export interface Flow {
+  key: string;
+  topic: string; // '' = 주제 없음
+  cardIds: string[];
+  conns: Connection[];
+  /** 학년(0 = 학교 공통) → 그 학년 카드 ID(원본 순서) */
+  byGrade: Map<number, string[]>;
+}
+
+/**
+ * 같은 검토 주제로 이어진 연결 묶음을 하나의 흐름으로 본다.
+ * 주제마다 연결로 닿는 카드끼리 한 흐름이 되며, 주제가 없는 연결도 이어진 것끼리 묶는다.
+ */
+export function flows(idx: Index, topicOrder: string[] = []): Flow[] {
+  const out: Flow[] = [];
+  const topics = Array.from(new Set(liveConns(idx).map((c) => c.topicId)));
+  for (const topic of topics) {
+    const conns = liveConns(idx, topic);
+    const parent = new Map<string, string>();
+    const find = (x: string): string => { let r = x; while (parent.get(r) !== r) r = parent.get(r)!; parent.set(x, r); return r; };
+    for (const c of conns) for (const id of [c.fromCardId, c.toCardId]) if (!parent.has(id)) parent.set(id, id);
+    for (const c of conns) parent.set(find(c.fromCardId), find(c.toCardId));
+    const groups = new Map<string, { ids: Set<string>; conns: Connection[] }>();
+    for (const c of conns) {
+      const r = find(c.fromCardId);
+      const g = groups.get(r) || { ids: new Set<string>(), conns: [] };
+      g.ids.add(c.fromCardId); g.ids.add(c.toCardId); g.conns.push(c);
+      groups.set(r, g);
+    }
+    for (const g of groups.values()) {
+      const cards = [...g.ids].map((id) => idx.cards.get(id)!).sort(compareCards);
+      const byGrade = new Map<number, string[]>();
+      for (const c of cards) byGrade.set(c.grade, [...(byGrade.get(c.grade) || []), c.id]);
+      out.push({ key: `${topic}|${cards[0].id}`, topic, cardIds: cards.map((c) => c.id), conns: g.conns, byGrade });
+    }
+  }
+  const rank = (t: string) => { const i = topicOrder.indexOf(t); return t === '' ? 10_000 : i < 0 ? 5_000 : i; };
+  const minGrade = (f: Flow) => Math.min(...f.byGrade.keys());
+  return out.sort((a, b) => rank(a.topic) - rank(b.topic) || a.topic.localeCompare(b.topic, 'ko') || minGrade(a) - minGrade(b) || b.cardIds.length - a.cardIds.length);
+}
+
+/** 새 연결의 검토 주제 기본값: 두 카드의 기존 연결에서 가장 많이 쓴 주제 */
+export function suggestTopic(idx: Index, a: string, b: string): string {
+  const count = new Map<string, number>();
+  for (const c of liveConns(idx)) {
+    if (!c.topicId || ![c.fromCardId, c.toCardId].some((id) => id === a || id === b)) continue;
+    count.set(c.topicId, (count.get(c.topicId) || 0) + 1);
+  }
+  return [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] || '';
 }
 
 // ───────────────────────── 학년 정비 완료 ─────────────────────────

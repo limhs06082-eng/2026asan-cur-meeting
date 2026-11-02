@@ -173,9 +173,8 @@ describe('연결과 확인 (A04, A05, A06)', () => {
     await createConn(as('ed3'), 'ed3', 'deepen__c3__c4', conn('ed3'));
     await assertFails(createConn(as('ed3'), 'ed3', 'deepen__c3__c4', conn('ed3'), 'cop2'));
   });
-  it('학년 건너뛰기 심화는 이유가 필요', async () => {
-    await assertFails(createConn(as('ed3'), 'ed3', 'deepen__c3__c6', conn('ed3', { toCardId: 'c6', toGrade: 6 })));
-    await assertSucceeds(createConn(as('ed3'), 'ed3', 'deepen__c3__c6', conn('ed3', { toCardId: 'c6', toGrade: 6, skipReason: '5학년은 다른 형식' })));
+  it('학년을 건너뛰는 심화도 이유 없이 만들 수 있다', async () => {
+    await assertSucceeds(createConn(as('ed3'), 'ed3', 'deepen__c3__c6', conn('ed3', { toCardId: 'c6', toGrade: 6 })));
   });
   it('열람자는 연결을 만들 수 없다', async () => {
     await assertFails(createConn(as('viewer'), 'viewer', 'deepen__c3__c4', conn('viewer')));

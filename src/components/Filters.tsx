@@ -44,11 +44,9 @@ export function FilterBar({ count }: { count: number }) {
         <option value="">영역: 전체</option>
         {(year?.categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      <select aria-label="검토 상태" value={f.state} onChange={(e) => set({ state: e.target.value as Filters['state'] })}>
+      <select aria-label="연결 상태" value={f.state} onChange={(e) => set({ state: e.target.value as Filters['state'] })}>
         <option value="">상태: 전체</option>
-        {Object.entries(CARD_STATE).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
-        <option value="needsCheck">⚠ 추가 확인</option>
-        <option value="unchecked">학년 미확인</option>
+        {Object.entries(CARD_STATE).map(([k, v]) => <option key={k} value={k}>{v.icon ? `${v.icon} ` : ''}{v.label}</option>)}
       </select>
       <select aria-label="변경 유형" value={f.change} onChange={(e) => set({ change: e.target.value as Filters['change'] })}>
         <option value="">변경: 전체</option>

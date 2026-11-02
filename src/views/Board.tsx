@@ -1,5 +1,6 @@
-// 전체 보드: 학교 공통 영역 + 영역(행) × 1~6학년(열). 선택한 카드의 연결만 강조하고 전체 선은 그리지 않는다.
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// 전체 보드: 학교 공통 영역 + 영역(행) × 1~6학년(열). 선택한 카드에서 이어지는 흐름(앞뒤 학년 전체)만 강조하고 전체 선은 그리지 않는다.
+// 카드 오른쪽 점을 끌어 다른 카드에 놓으면 연결 창이 열린다.
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 
 const LS_COMMON = 'asan.commonOpen';
 const readOpen = () => { try { return localStorage.getItem(LS_COMMON) !== '0'; } catch { return true; } };
@@ -12,10 +13,12 @@ import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import { CardChip } from '../components/CardChip';
 import { FilterBar, applyFilters } from '../components/Filters';
-import { GRADES, CONNECTION_TYPES, CARD_STATE, connectionState, gradeLabel } from '../lib/domain';
+import { GRADES, CONNECTION_TYPES, CARD_STATE, compareCards, connectedChain, connectionState, gradeLabel, isLive } from '../lib/domain';
+import { useToast } from '../components/ui';
 import type { Card, Connection } from '../lib/types';
 
-interface Line { x1: number; y1: number; x2: number; y2: number; conn: Connection; agreed: boolean; dir: boolean }
+interface Line { x1: number; y1: number; x2: number; y2: number; v: boolean; conn: Connection; agreed: boolean; dir: boolean }
+interface Drag { fromId: string; x1: number; y1: number; x2: number; y2: number; overId: string | null }
 
 export function Board() {
   const app = useApp();
@@ -28,6 +31,11 @@ export function Board() {
   const [big, setBig] = useState(false);
   const [tipClosed, setTipClosed] = useState(readTip);
   const [detail, setDetail] = useState(readDetail);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  // 끄는 중의 포인터 위치(화면 좌표). 매 프레임 가장자리 자동 스크롤에 쓴다
+  const dragRef = useRef<{ id: string; cx: number; cy: number } | null>(null);
+  const toast = useToast();
+  const canLink = app.perm.canWrite;
   const toggleDetail = () => { const v = !detail; setDetail(v); try { localStorage.setItem(LS_DETAIL, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
   const toggleCommon = () => { const v = !commonOpen; setCommonOpen(v); try { localStorage.setItem(LS_COMMON, v ? '1' : '0'); } catch { /* 저장 불가 */ } };
 
@@ -55,9 +63,101 @@ export function Board() {
       }
       return { ids: new Set<string>(), conns: [] as Connection[] };
     }
-    const conns = connections.filter((c) => !c.deletedAt && (c.fromCardId === selectedCardId || c.toCardId === selectedCardId) && (!f.topic || c.topicId === f.topic));
-    return { ids: new Set(conns.flatMap((c) => [c.fromCardId, c.toCardId])), conns };
-  }, [selectedCardId, connections, f.topic, topicLines, shown]);
+    // 바로 이어진 카드뿐 아니라 연결을 따라 닿는 앞뒤 학년 카드 전체(1~6학년 흐름)
+    const ch = connectedChain(idx, selectedCardId, f.topic);
+    return { ids: ch.conns.length ? ch.cardIds : new Set<string>(), conns: ch.conns };
+  }, [selectedCardId, connections, idx, f.topic, topicLines, shown]);
+  // 선택한 카드가 속한 흐름을 학년 순서로(빈 학년은 흐름이 끊긴 곳)
+  const strip = useMemo(() => {
+    if (!selectedCardId || related.ids.size < 2) return null;
+    const list = [...related.ids].map((id) => idx.cards.get(id)).filter((c): c is Card => !!c).sort(compareCards);
+    const gs = [...(list.some((c) => c.grade === 0) ? [0] : []), ...GRADES];
+    return gs.map((g) => ({ g, cards: list.filter((c) => c.grade === g) }));
+  }, [selectedCardId, related, idx]);
+
+  // ── 점을 끌어 연결하기
+  const toLocal = (cx: number, cy: number) => {
+    const w = wrapRef.current!;
+    const b = w.getBoundingClientRect();
+    return { x: cx - b.left + w.scrollLeft, y: cy - b.top + w.scrollTop };
+  };
+  const beginDrag = (c: Card, e: RPointerEvent) => {
+    if (e.button !== 0 || !wrapRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const p = toLocal(e.clientX, e.clientY);
+    dragRef.current = { id: c.id, cx: e.clientX, cy: e.clientY };
+    setDrag({ fromId: c.id, x1: p.x, y1: p.y, x2: p.x, y2: p.y, overId: null });
+  };
+  const finishDrag = useCallback((a: string, b: string) => {
+    const ca = idx.cards.get(a);
+    const cb = idx.cards.get(b);
+    if (!isLive(ca) || !isLive(cb)) { toast('제외된 카드와는 연결할 수 없습니다.', 'warn'); return; }
+    const existing = connections.find((c) => !c.deletedAt && ((c.fromCardId === a && c.toCardId === b) || (c.fromCardId === b && c.toCardId === a)));
+    if (existing) { toast('이미 연결된 두 카드입니다. 연결 내용을 엽니다.'); app.selectConnection(existing.id); return; }
+    // 학년이 낮은 쪽(학교 공통 포함)을 앞 카드로 둔다. 창에서 방향을 바꿀 수 있다
+    const [from, to] = cb!.grade < ca!.grade ? [b, a] : [a, b];
+    app.openConnectionEditor({ fromCardId: from, toCardId: to, quick: true });
+  }, [idx, connections, toast, app]);
+  const dragging = !!drag;
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!dragging || !wrap) return;
+    const targetAt = (cx: number, cy: number) => {
+      const el = document.elementFromPoint(cx, cy)?.closest<HTMLElement>('[data-card]');
+      const id = el && wrap.contains(el) ? el.dataset.card || null : null;
+      return id && id !== dragRef.current?.id ? id : null;
+    };
+    const follow = (cx: number, cy: number) => {
+      const b = wrap.getBoundingClientRect();
+      const x = cx - b.left + wrap.scrollLeft;
+      const y = cy - b.top + wrap.scrollTop;
+      const over = targetAt(cx, cy);
+      setDrag((o) => o && { ...o, x2: x, y2: y, overId: over });
+    };
+    const move = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      d.cx = e.clientX; d.cy = e.clientY;
+      follow(e.clientX, e.clientY);
+    };
+    const end = (e: PointerEvent) => {
+      const from = dragRef.current?.id;
+      const to = targetAt(e.clientX, e.clientY);
+      dragRef.current = null;
+      setDrag(null);
+      if (from && to) finishDrag(from, to);
+    };
+    const cancel = () => { dragRef.current = null; setDrag(null); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') cancel(); };
+    // 보드 가장자리 가까이 끌면 그 방향으로 스크롤해 화면 밖 학년 카드에도 닿게 한다
+    let raf = 0;
+    const tick = () => {
+      const d = dragRef.current;
+      if (d) {
+        const b = wrap.getBoundingClientRect();
+        const edge = 44;
+        const dx = d.cx > b.right - edge ? 14 : d.cx < b.left + edge ? -14 : 0;
+        const dy = d.cy > b.bottom - edge ? 14 : d.cy < b.top + edge ? -14 : 0;
+        if (dx || dy) { wrap.scrollBy(dx, dy); follow(d.cx, d.cy); }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', key);
+    document.body.classList.add('linking');
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', key);
+      document.body.classList.remove('linking');
+    };
+  }, [dragging, finishDrag]);
 
   const onCardClick = useCallback((c: Card) => {
     if (connectFrom) {
@@ -73,18 +173,26 @@ export function Board() {
     const wrap = wrapRef.current;
     if (!wrap || related.conns.length === 0) { setLines([]); return; }
     const base = wrap.getBoundingClientRect();
-    const pos = (id: string) => {
+    const box = (id: string) => {
       const el = wrap.querySelector<HTMLElement>(`[data-card="${CSS.escape(id)}"]`);
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return { x: r.left - base.left + wrap.scrollLeft + r.width / 2, y: r.top - base.top + wrap.scrollTop + r.height / 2 };
+      const l = r.left - base.left + wrap.scrollLeft;
+      const t = r.top - base.top + wrap.scrollTop;
+      return { l, t, r: l + r.width, b: t + r.height, cx: l + r.width / 2, cy: t + r.height / 2 };
     };
     const out: Line[] = [];
     for (const c of related.conns) {
-      const a = pos(c.fromCardId);
-      const b = pos(c.toCardId);
+      const a = box(c.fromCardId);
+      const b = box(c.toCardId);
       if (!a || !b) continue;
-      out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, conn: c, agreed: connectionState(c, idx).state === 'agreed', dir: !CONNECTION_TYPES[c.type].symmetric });
+      // 카드 글자를 가리지 않도록 가운데가 아니라 마주 보는 가장자리끼리 잇는다
+      let p: { x1: number; y1: number; x2: number; y2: number; v: boolean };
+      if (a.r <= b.l) p = { x1: a.r, y1: a.cy, x2: b.l, y2: b.cy, v: false };
+      else if (b.r <= a.l) p = { x1: a.l, y1: a.cy, x2: b.r, y2: b.cy, v: false };
+      else if (a.b <= b.t) p = { x1: a.cx, y1: a.b, x2: b.cx, y2: b.t, v: true };
+      else p = { x1: a.cx, y1: a.t, x2: b.cx, y2: b.b, v: true };
+      out.push({ ...p, conn: c, agreed: connectionState(c, idx).state === 'agreed', dir: !CONNECTION_TYPES[c.type].symmetric });
     }
     setLines(out);
   }, [related, idx]);
@@ -116,11 +224,21 @@ export function Board() {
     return m;
   }, [shown]);
 
-  const chip = (x: (typeof shown)[number]) => (
-    <CardChip key={x.card.id} card={x.card} st={x.st} catName="" selected={x.card.id === selectedCardId || x.card.id === connectFrom}
-      related={related.ids.has(x.card.id) && x.card.id !== selectedCardId} dimmed={!!selectedCardId && related.ids.size > 0 && !related.ids.has(x.card.id)}
-      connectMode={!!connectFrom} onClick={onCardClick} simple={!detail} />
-  );
+  const chip = (x: (typeof shown)[number]) => {
+    const el = (
+      <CardChip key={x.card.id} card={x.card} st={x.st} catName="" selected={x.card.id === selectedCardId || x.card.id === connectFrom}
+        related={related.ids.has(x.card.id) && x.card.id !== selectedCardId} dimmed={!!selectedCardId && related.ids.size > 0 && !related.ids.has(x.card.id)}
+        connectMode={!!connectFrom} onClick={onCardClick} simple={!detail} />
+    );
+    if (!canLink || x.card.deletedAt) return el;
+    // 점은 카드 버튼 밖에 둔다(버튼 안에 다른 조작 요소를 넣지 않음). 키보드로는 상세의 '연결 만들기'를 쓴다
+    return (
+      <span key={x.card.id} className={`chip-slot ${drag?.overId === x.card.id ? 'drop' : ''} ${drag?.fromId === x.card.id ? 'drag-from' : ''}`}>
+        {el}
+        <span className="link-dot" aria-hidden onPointerDown={(e) => beginDrag(x.card, e)} title="끌어서 다른 학년 카드에 놓으면 연결합니다" />
+      </span>
+    );
+  };
 
   const common = byCell.get('common') || [];
   const canAdd = (g: number) => app.perm.canEditGrade(g);
@@ -129,7 +247,7 @@ export function Board() {
     <div className={`board-page ${big ? 'big' : ''} ${detail ? '' : 'simple'}`}>
       {!tipClosed && app.perm.canWrite ? (
         <div className="tip" role="note">
-          처음이라면: <strong>‘내 학년만’</strong> → 카드 누르기 → <strong>카드 수정</strong>(배움의 목적 쓰기) → <strong>실제 운영과 맞음 — 확인</strong> → 이어지는 카드와 <strong>연결 만들기</strong>. 자세한 내용은 ‘사용 안내’.
+          연결하는 법: 카드 오른쪽의 <strong>점(●)을 끌어</strong> 이어지는 다른 학년 카드에 놓으세요. 창이 뜨면 왜 연결하는지, 이어받을 배움, 깊어지는 것을 씁니다. 카드를 누르면 그 카드에서 이어지는 <strong>1~6학년 흐름</strong>이 선으로 보입니다.
           <button className="btn tiny ghost" onClick={() => { setTipClosed(true); try { localStorage.setItem(LS_TIP, '1'); } catch { /* 저장 불가 */ } }} aria-label="안내 닫기">닫기</button>
         </div>
       ) : null}
@@ -141,11 +259,25 @@ export function Board() {
         </span>
         <button className="btn tiny" aria-pressed={big} onClick={() => setBig(!big)} title="전자칠판·화면 공유용으로 글자를 크게 봅니다(내 화면에만 적용)">{big ? '보통 크기' : '크게 보기'}</button>
         <span className="state-legend muted" aria-label="카드 왼쪽 색 띠의 뜻">
-          {(['agreed', 'independent', 'proposed', 'needsReview'] as const).map((k) => <span key={k} className={`lg s-${k}`}>{CARD_STATE[k].label}</span>)}
+          {(['agreed', 'proposed', 'independent'] as const).map((k) => <span key={k} className={`lg s-${k}`}>{CARD_STATE[k].label}</span>)}
         </span>
       </div>
       {f.topic ? (
         <label className="check topic-lines"><input type="checkbox" checked={topicLines} onChange={(e) => setTopicLines(e.target.checked)} /> ‘{f.topic}’ 주제의 연결선 보기 {topicLines && !selectedCardId ? `(${related.conns.length}개)` : ''}</label>
+      ) : null}
+      {strip ? (
+        <div className="flow-strip" role="status" aria-label="선택한 카드의 1~6학년 흐름">
+          <span className="flow-label">흐름{f.topic ? ` · ${f.topic}` : ''}</span>
+          {strip.map(({ g, cards: list }, i) => (
+            <span key={g} className={`flow-step ${list.length ? '' : 'gap'}`}>
+              {i > 0 ? <span className="flow-arrow" aria-hidden>→</span> : null}
+              <span className="flow-g">{gradeLabel(g)}</span>
+              {list.length ? list.map((c) => (
+                <button key={c.id} type="button" className={`flow-card ${c.id === selectedCardId ? 'on' : ''}`} onClick={() => app.selectCard(c.id)}>{c.title}</button>
+              )) : <span className="flow-empty" title="이 학년에서는 흐름이 끊겨 있습니다">비어 있음</span>}
+            </span>
+          ))}
+        </div>
       ) : null}
       {connectFrom ? (
         <div className="connect-banner" role="status">
@@ -199,6 +331,12 @@ export function Board() {
             ))}
           </tbody>
         </table>
+        {drag ? (
+          <svg className="lines drag-line" aria-hidden width={wrapRef.current?.scrollWidth} height={wrapRef.current?.scrollHeight}>
+            <path d={`M${drag.x1},${drag.y1} L${drag.x2},${drag.y2}`} />
+            <circle cx={drag.x2} cy={drag.y2} r={6} />
+          </svg>
+        ) : null}
         {lines.length > 0 ? (
           <svg className="lines" aria-hidden width={wrapRef.current?.scrollWidth} height={wrapRef.current?.scrollHeight}>
             <defs>
@@ -206,14 +344,14 @@ export function Board() {
             </defs>
             {lines.map((l) => (
               <g key={l.conn.id} className={`line ${l.conn.type} ${l.agreed ? 'agreed' : 'open'}`}>
-                <path d={`M${l.x1},${l.y1} C${(l.x1 + l.x2) / 2},${l.y1} ${(l.x1 + l.x2) / 2},${l.y2} ${l.x2},${l.y2}`} markerEnd={l.dir ? 'url(#arrow)' : undefined} />
+                <path d={l.v ? `M${l.x1},${l.y1} C${l.x1},${(l.y1 + l.y2) / 2} ${l.x2},${(l.y1 + l.y2) / 2} ${l.x2},${l.y2}` : `M${l.x1},${l.y1} C${(l.x1 + l.x2) / 2},${l.y1} ${(l.x1 + l.x2) / 2},${l.y2} ${l.x2},${l.y2}`} markerEnd={l.dir ? 'url(#arrow)' : undefined} />
               </g>
             ))}
           </svg>
         ) : null}
       </div>
       <p className="legend muted">
-        선을 누르는 대신 오른쪽 상세 패널의 ‘연결’ 목록에서 같은 내용을 볼 수 있습니다. 실선=합의, 점선=확인 전. 색: 심화(파랑)·공동활동(초록)·공통 운영(보라). 화살표는 배움의 방향.
+        카드 오른쪽 점(●)을 끌어 다른 카드에 놓으면 연결합니다. 카드를 누르면 이어지는 흐름 전체가 선으로 보입니다. 실선=합의, 점선=확인 전. 색: 심화(파랑)·공동활동(초록)·공통 운영(보라). 화살표는 배움의 방향.
       </p>
     </div>
   );

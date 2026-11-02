@@ -49,7 +49,6 @@ export function CardDetail({ card }: { card: Card }) {
             <StatusBadge st={st} />
             <span className="muted small">({st.scope === 'topic' ? `‘${topic}’ 주제 기준` : '전체 기준'})</span>
             {topic && stAll.state !== st.state ? <><StatusBadge st={stAll} /><span className="muted small">(전체 기준)</span></> : null}
-            {st.needsCheck ? <span className="badge st-needs">⚠ 추가 확인</span> : null}
             {card.deletedAt ? <span className="badge st-excluded">제외됨: {card.deleteReason}</span> : null}
           </div>
         </div>
@@ -68,27 +67,6 @@ export function CardDetail({ card }: { card: Card }) {
       </div>
 
       <section className="box">
-        <h3>학년 사실 확인</h3>
-        {card.grade === 0 ? <p className="muted">학교 공통 카드는 학년 사실 확인 대상이 아닙니다. 적용 학년을 확인한 뒤 학년별 카드로 나누세요.</p> : (
-          <>
-            <p>
-              {checked ? <span className="badge st-checked">✓ 현재 버전 확인됨</span> : <span className="badge st-unchecked">미확인</span>}{' '}
-              {check && !check.revokedAt && !checked ? <span className="warn-text">이전 버전(v{check.contentVersion})에 대한 확인은 내용이 바뀌어 무효입니다. 다시 확인해 주세요.</span> : null}
-              {check && checked ? <span className="muted"> {check.name} · {fmtTime(check.at)}</span> : null}
-              {card.origin === 'source' && !checked ? <span className="muted"> 원본에서 가져옴 · 학년 미확인</span> : null}
-            </p>
-            {canEdit && !card.deletedAt ? (
-              checked
-                ? <button className="btn" onClick={() => quick((op) => setCardCheck(yid, app.actor, op, card, false), '확인을 해제했습니다')}>확인 해제</button>
-                : <button className="btn primary" disabled={!card.learningPurpose.trim()} title={card.learningPurpose.trim() ? '' : '배움의 목적을 먼저 적어 주세요'}
-                    onClick={() => quick((op) => setCardCheck(yid, app.actor, op, card, true), '실제 운영 사실을 확인했습니다')}>실제 운영과 맞음 — 확인</button>
-            ) : null}
-            {!card.learningPurpose.trim() ? <p className="warn-text small">배움의 목적이 비어 있어 확인할 수 없습니다.</p> : null}
-          </>
-        )}
-      </section>
-
-      <section className="box">
         <h3>배움의 목적</h3>
         <p className="pre">{card.learningPurpose || <span className="muted">(아직 비어 있음)</span>}</p>
         <dl className="kv">
@@ -99,7 +77,31 @@ export function CardDetail({ card }: { card: Card }) {
           {Object.entries(card.planningDetails || {}).filter(([, v]) => v).map(([k, v]) => <Fragment key={k}><dt>{PLAN_LABEL[k] || k}</dt><dd className="pre">{String(v)}</dd></Fragment>)}
           {card.addReason ? <><dt>추가 이유</dt><dd>{card.addReason}</dd></> : null}
         </dl>
-        {card.checkFlags.length ? <div className="flags">{card.checkFlags.map((f) => <div key={f} className="flag">⚠ {f}</div>)}</div> : null}
+        {card.checkFlags.length ? <div className="flags">{card.checkFlags.map((f) => <div key={f} className="flag">원본 메모: {f}</div>)}</div> : null}
+      </section>
+
+      <section className="box">
+        <h3>연결 ({conns.filter((c) => !c.deletedAt).length})</h3>
+        {conns.length === 0 ? <p className="muted">아직 연결이 없습니다. 연결되지 않은 활동이 곧 잘못된 활동은 아닙니다.</p> : (
+          <ul className="conn-list">
+            {conns.map((c) => {
+              const s = connectionState(c, idx);
+              const otherId = c.fromCardId === card.id ? c.toCardId : c.fromCardId;
+              const other = idx.cards.get(otherId);
+              const arrow = CONNECTION_TYPES[c.type].symmetric ? '↔' : c.fromCardId === card.id ? '→' : '←';
+              return (
+                <li key={c.id} className={c.deletedAt ? 'removed' : ''}>
+                  <button className="link" onClick={() => app.selectConnection(c.id)}>
+                    <span className={`ctype ${c.type}`}>{CONNECTION_TYPES[c.type].label}</span> {arrow} {other ? `${gradeLabel(other.grade)} ${other.title}` : '(없는 카드)'}
+                  </button>
+                  <span className={`badge cs-${s.state}`}>{CONN_STATE_LABEL[s.state]}</span>
+                  {c.topicId ? <span className="pill">{c.topicId}</span> : null}
+                  <div className="muted small">{c.reason}</div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="box">
@@ -139,30 +141,6 @@ export function CardDetail({ card }: { card: Card }) {
       ) : null}
 
       <section className="box">
-        <h3>연결 ({conns.filter((c) => !c.deletedAt).length})</h3>
-        {conns.length === 0 ? <p className="muted">아직 연결이 없습니다. 연결되지 않은 활동이 곧 잘못된 활동은 아닙니다.</p> : (
-          <ul className="conn-list">
-            {conns.map((c) => {
-              const s = connectionState(c, idx);
-              const otherId = c.fromCardId === card.id ? c.toCardId : c.fromCardId;
-              const other = idx.cards.get(otherId);
-              const arrow = CONNECTION_TYPES[c.type].symmetric ? '↔' : c.fromCardId === card.id ? '→' : '←';
-              return (
-                <li key={c.id} className={c.deletedAt ? 'removed' : ''}>
-                  <button className="link" onClick={() => app.selectConnection(c.id)}>
-                    <span className={`ctype ${c.type}`}>{CONNECTION_TYPES[c.type].label}</span> {arrow} {other ? `${gradeLabel(other.grade)} ${other.title}` : '(없는 카드)'}
-                  </button>
-                  <span className={`badge cs-${s.state}`}>{CONN_STATE_LABEL[s.state]}</span>
-                  {c.topicId ? <span className="pill">{c.topicId}</span> : null}
-                  <div className="muted small">{c.reason}</div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="box">
         <h3>독립 운영·추가 확인 판단</h3>
         <p className="muted small">연결 여부와 별개로, 특정 주제(또는 전체)에서 따로 운영할 이유가 있거나 사실 확인이 더 필요한지 기록합니다. 해당 학년 대표가 확인하면 ‘독립 운영 합의’가 됩니다.</p>
         {reviews.length ? (
@@ -172,6 +150,27 @@ export function CardDetail({ card }: { card: Card }) {
         ) : null}
         {canEdit && !card.deletedAt ? <button className="btn tiny" onClick={() => setDialog({ review: topic })}>판단 기록하기{topic ? ` (‘${topic}’)` : ''}</button> : null}
       </section>
+
+      {card.grade > 0 ? (
+      <section className="box">
+        <h3>실제 운영 확인 <span className="muted small">(선택)</span></h3>
+        {(
+          <>
+            <p>
+              {checked ? <span className="badge st-checked">✓ 현재 버전 확인됨</span> : null}{' '}
+              {check && !check.revokedAt && !checked ? <span className="warn-text">이전 버전(v{check.contentVersion})에 대한 확인은 내용이 바뀌어 무효입니다. 다시 확인해 주세요.</span> : null}
+              {check && checked ? <span className="muted"> {check.name} · {fmtTime(check.at)}</span> : null}
+            </p>
+            {canEdit && !card.deletedAt ? (
+              checked
+                ? <button className="btn" onClick={() => quick((op) => setCardCheck(yid, app.actor, op, card, false), '확인을 해제했습니다')}>확인 해제</button>
+                : <button className="btn primary" disabled={!card.learningPurpose.trim()} title={card.learningPurpose.trim() ? '' : '배움의 목적을 먼저 적어 주세요'}
+                    onClick={() => quick((op) => setCardCheck(yid, app.actor, op, card, true), '실제 운영 사실을 확인했습니다')}>실제 운영과 맞음 — 확인</button>
+            ) : null}
+          </>
+        )}
+      </section>
+      ) : null}
 
       {proposals.length ? (
         <section className="box">

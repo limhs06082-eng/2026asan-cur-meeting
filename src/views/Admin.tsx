@@ -162,7 +162,7 @@ function FinalizeDialog({ yr, onClose }: { yr: YearDoc; onClose: () => void }) {
   const sameYear = y.yearId === yr.id && y.year?.id === yr.id;
   const un = sameYear ? unresolvedSummary(y.idx) : null;
   const serverOk = y.sync.loaded && !y.sync.fromCache;
-  const blocked = !un || un.uncheckedCards.length > 0;
+  const blocked = !un;
   return (
     <Modal wide title={`확정 전 점검 — ${yr.title}`} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>닫기</button>
@@ -177,12 +177,12 @@ function FinalizeDialog({ yr, onClose }: { yr: YearDoc; onClose: () => void }) {
         <>
           {!serverOk ? <div className="alert warn">서버 동기화가 확인되지 않아 확정할 수 없습니다.</div> : null}
           <ul>
-            <li className={un.uncheckedCards.length ? 'warn-text' : ''}>학년 사실 확인 전 카드: <strong>{un.uncheckedCards.length}</strong>개 {un.uncheckedCards.length ? '— 확정 전에 모두 확인해야 합니다.' : '✓'}</li>
+            <li>학년 사실 확인 전 카드: <strong>{un.uncheckedCards.length}</strong>개 <span className="muted small">(참고용 — 확정을 막지 않습니다)</span></li>
             <li>합의 전 연결(제안·일부 확인·재확인 필요): {un.openConnections.length}개</li>
             <li>추가 확인 판단: {un.needsCheck.length}건</li>
             <li>논의 중 제안: {un.discussing.length}건 · 보류: {un.held.length}건</li>
           </ul>
-          {un.uncheckedCards.length ? <details><summary>미확인 카드 목록</summary><ul className="plain">{un.uncheckedCards.map((c) => <li key={c.id}>{gradeLabel(c.grade)} {c.title}</li>)}</ul></details> : null}
+          {un.uncheckedCards.length ? <details><summary>사실 확인 전 카드 목록</summary><ul className="plain">{un.uncheckedCards.map((c) => <li key={c.id}>{gradeLabel(c.grade)} {c.title}</li>)}</ul></details> : null}
           {un.openConnections.length ? <details><summary>합의 전 연결 목록</summary><ul className="plain">{un.openConnections.map((c) => { const f = y.idx.cards.get(c.fromCardId); const t = y.idx.cards.get(c.toCardId); return <li key={c.id}>{f ? `${gradeLabel(f.grade)} ${f.title}` : '?'} → {t ? `${gradeLabel(t.grade)} ${t.title}` : '?'} <span className="muted small">({connectionState(c, y.idx).needGrades.map(gradeLabel).join('·')} 확인 필요)</span></li>; })}</ul></details> : null}
           {un.needsCheck.length ? <details><summary>추가 확인 판단 목록</summary><ul className="plain">{un.needsCheck.map((r) => <li key={r.id}>{y.idx.cards.get(r.cardId)?.title} — {r.topicId || '전체'}: {r.reason}</li>)}</ul></details> : null}
           {un.held.length + un.discussing.length ? <details><summary>보류·논의 중 제안 목록</summary><ul className="plain">{[...un.held, ...un.discussing].map((p) => <li key={p.id}>[{p.status === 'held' ? '보류' : '논의 중'}] {p.title}{p.handover ? ' · 다음 학년도 전달' : ''}</li>)}</ul></details> : null}

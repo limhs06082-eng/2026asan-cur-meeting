@@ -5,7 +5,7 @@ import type { Perm } from './perm';
 import type { Member, ChangeType } from './types';
 import type { CardState } from './domain';
 
-export type View = 'board' | 'list' | 'connections' | 'checks' | 'grades' | 'output' | 'admin' | 'guide';
+export type View = 'board' | 'flows' | 'list' | 'connections' | 'checks' | 'grades' | 'output' | 'admin' | 'guide';
 
 export interface Filters {
   search: string;
@@ -31,7 +31,7 @@ export interface AppState {
   connectFrom: string | null; // 연결 시작 카드(연결할 카드 선택 중)
   startConnect: (id: string | null) => void;
   openCardEditor: (opts: { cardId?: string; grade?: number; category?: string; proposalId?: string }) => void;
-  openConnectionEditor: (opts: { connectionId?: string; fromCardId?: string; toCardId?: string }) => void;
+  openConnectionEditor: (opts: { connectionId?: string; fromCardId?: string; toCardId?: string; quick?: boolean }) => void;
   openProposalEditor: (opts: { targetType: 'card' | 'connection' | 'none'; targetId?: string; grade?: number; kind?: string }) => void;
   selectedConnectionId: string | null;
   selectConnection: (id: string | null) => void;

@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { useApp } from '../lib/app';
 import { useYear } from '../lib/data';
 import {
-  CONNECTION_TYPES, CONN_STATE_LABEL, connectionGrades, connectionKey, connectionState, gradeLabel, isApprovalValid, isLive, validateConnection, approvalId, type ConnectionDraft,
+  CONNECTION_TYPES, CONN_STATE_LABEL, connectionGrades, connectionKey, connectionState, gradeLabel, isApprovalValid, isLive, validateConnection, approvalId, suggestTopic, type ConnectionDraft,
 } from '../lib/domain';
 import { createConnection, updateConnection, removeConnection, setApproval } from '../lib/repo';
 import type { Card, Connection, ConnectionType } from '../lib/types';
@@ -30,7 +30,8 @@ const emptyDraft = (from = '', to = ''): ConnectionDraft => ({
   type: 'deepen', fromCardId: from, toCardId: to, topicId: '', reason: '', inheritedLearning: '', deepenedLearning: '', skipReason: '', rolesByGrade: {}, sharedResult: '', commonGoal: '', gradeScope: '',
 });
 
-export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }: { connectionId?: string; fromCardId?: string; toCardId?: string; onClose: () => void }) {
+/** quick: 보드에서 점을 끌어 두 카드를 고른 경우. 종류(배움의 심화)와 카드는 정해져 있고 네 칸만 쓴다. */
+export function ConnectionEditor({ connectionId, fromCardId, toCardId, quick, onClose }: { connectionId?: string; fromCardId?: string; toCardId?: string; quick?: boolean; onClose: () => void }) {
   const app = useApp();
   const y = useYear();
   const toast = useToast();
@@ -39,7 +40,8 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
     type: existing.type, fromCardId: existing.fromCardId, toCardId: existing.toCardId, topicId: existing.topicId, reason: existing.reason,
     inheritedLearning: existing.inheritedLearning, deepenedLearning: existing.deepenedLearning, skipReason: existing.skipReason,
     rolesByGrade: existing.rolesByGrade || {}, sharedResult: existing.sharedResult, commonGoal: existing.commonGoal, gradeScope: existing.gradeScope,
-  } : emptyDraft(fromCardId, toCardId));
+  } : { ...emptyDraft(fromCardId, toCardId), topicId: app.filters.topic || (fromCardId && toCardId ? suggestTopic(y.idx, fromCardId, toCardId) : '') });
+  const [quickMode, setQuickMode] = useState(!!quick && !existing);
   const [baseVersion, setBaseVersion] = useState(existing?.version ?? 0);
   const [problems, setProblems] = useState<string[]>([]);
   const saver = useSaver<Connection>(`conn-${connectionId || 'new'}`);
@@ -67,7 +69,7 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
   const latest = saver.status === 'conflict' ? saver.latest : null;
 
   return (
-    <Modal wide title={existing ? '연결 수정' : '연결 만들기'} onClose={closeAsk} footer={<>
+    <Modal wide title={existing ? '연결 수정' : quickMode ? '연결하기' : '연결 만들기'} onClose={closeAsk} footer={<>
       <SaveBadge status={saver.status} message={saver.message} />
       <button className="btn" onClick={closeAsk}>닫기</button>
       <button className="btn primary" onClick={save} disabled={saver.status === 'saving' || !y.online}>저장</button>
@@ -84,7 +86,13 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
         </div>
       ) : null}
       {problems.length ? <div className="alert warn"><ul>{problems.map((p) => <li key={p}>{p}</li>)}</ul></div> : null}
-      {existing ? (
+      {quickMode ? (
+        <div className="quick-pair">
+          <div className="box small"><span className="muted small">앞 카드</span><strong>{from ? `${gradeLabel(from.grade)} ${from.title}` : '?'}</strong><div className="muted small">{from?.learningPurpose || ''}</div></div>
+          <button type="button" className="btn tiny" title="앞뒤 방향 바꾸기" aria-label="앞뒤 방향 바꾸기" onClick={() => setDraft((d) => ({ ...d, fromCardId: d.toCardId, toCardId: d.fromCardId }))}>→<br />⇄</button>
+          <div className="box small"><span className="muted small">뒤 카드(배움이 깊어지는 곳)</span><strong>{to ? `${gradeLabel(to.grade)} ${to.title}` : '?'}</strong><div className="muted small">{to?.learningPurpose || ''}</div></div>
+        </div>
+      ) : existing ? (
         <p><strong>{from ? `${gradeLabel(from.grade)} ${from.title}` : '?'}</strong> {CONNECTION_TYPES[existing.type].symmetric ? '↔' : '→'} <strong>{to ? `${gradeLabel(to.grade)} ${to.title}` : '?'}</strong> · {CONNECTION_TYPES[existing.type].label}
           <br /><span className="muted small">종류나 양 끝 카드를 바꾸려면 이 연결을 취소하고 새로 만드세요(기존 확인 기록은 이력으로 남습니다).</span></p>
       ) : (
@@ -114,11 +122,11 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
             {(y.year?.topics || []).map((t) => <option key={t}>{t}</option>)}
           </select>
         </Field>
-        <Field label="왜 연결하는가" required><textarea rows={2} value={draft.reason} maxLength={2000} onChange={(e) => set('reason', e.target.value)} /></Field>
+        <Field label="왜 연결하는가" required><textarea rows={2} value={draft.reason} maxLength={2000} onChange={(e) => set('reason', e.target.value)} autoFocus={quickMode} /></Field>
         {draft.type === 'deepen' ? <>
-          <Field label="앞 카드에서 경험한 것(이어받을 배움)" required><textarea rows={2} value={draft.inheritedLearning} maxLength={2000} onChange={(e) => set('inheritedLearning', e.target.value)} /></Field>
-          <Field label="뒤 카드에서 깊어지는 것" required><textarea rows={2} value={draft.deepenedLearning} maxLength={2000} onChange={(e) => set('deepenedLearning', e.target.value)} /></Field>
-          {from && to && from.grade > 0 && to.grade > 0 && Math.abs(to.grade - from.grade) > 1 ? <Field label="학년을 건너뛰는 이유" required><textarea rows={2} value={draft.skipReason} onChange={(e) => set('skipReason', e.target.value)} /></Field> : null}
+          <Field label={`이어받을 배움${from ? ` — ${from.title}에서 경험한 것` : ''}`} required><textarea rows={2} value={draft.inheritedLearning} maxLength={2000} onChange={(e) => set('inheritedLearning', e.target.value)} /></Field>
+          <Field label={`뒤 카드에서 깊어지는 것${to ? ` — ${to.title}에서` : ''}`} required><textarea rows={2} value={draft.deepenedLearning} maxLength={2000} onChange={(e) => set('deepenedLearning', e.target.value)} /></Field>
+          {!quickMode && from && to && from.grade > 0 && to.grade > 0 && Math.abs(to.grade - from.grade) > 1 ? <Field label="학년을 건너뛰는 이유(선택)"><textarea rows={2} value={draft.skipReason} onChange={(e) => set('skipReason', e.target.value)} /></Field> : null}
         </> : null}
         {draft.type === 'joint' ? <>
           {grades.map((g) => <Field key={g} label={`${gradeLabel(g)}의 역할`} required><textarea rows={2} value={draft.rolesByGrade[`g${g}`] || ''} onChange={(e) => set('rolesByGrade', { ...draft.rolesByGrade, [`g${g}`]: e.target.value })} /></Field>)}
@@ -129,7 +137,8 @@ export function ConnectionEditor({ connectionId, fromCardId, toCardId, onClose }
           <Field label="학년별로 달리 운영할 범위" required><textarea rows={2} value={draft.gradeScope} onChange={(e) => set('gradeScope', e.target.value)} /></Field>
         </> : null}
       </div>
-      <p className="muted small">저장 후 관련 학년 대표가 각각 확인해야 ‘연결 합의’가 됩니다. 같은 학년 안의 연결은 그 학년 대표의 확인으로 충분합니다.</p>
+      {quickMode ? <p className="small"><button type="button" className="link" onClick={() => setQuickMode(false)}>공동활동·공통 운영 등 다른 종류로 만들기</button></p> : null}
+      <p className="muted small">같은 검토 주제로 이어진 연결은 ‘흐름’ 화면에서 1~6학년 줄기로 모여 보입니다. 저장 후 관련 학년 대표가 확인하면 ‘연결 합의’(실선)가 됩니다.</p>
     </Modal>
   );
 }

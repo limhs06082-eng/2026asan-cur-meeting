@@ -30,16 +30,16 @@ export function ListView() {
       </div>
       <div className="table-scroll">
         <table className="simple cards-table">
-          <thead><tr><th>학년</th><th>활동명</th><th>배움의 목적</th><th>대표 영역</th><th>검토 상태</th><th>학년 확인</th><th>변경</th><th>연결</th><th>최근 수정</th></tr></thead>
+          <thead><tr><th>학년</th><th>활동명</th><th>배움의 목적</th><th>대표 영역</th><th>연결 상태</th><th>학년 확인</th><th>변경</th><th>연결</th><th>최근 수정</th></tr></thead>
           <tbody>
             {rows.map(({ card, st }) => (
               <tr key={card.id} className={`clickable ${card.deletedAt ? 'removed' : ''}`} tabIndex={0} onClick={() => app.selectCard(card.id)} onKeyDown={(e) => e.key === 'Enter' && app.selectCard(card.id)}>
                 <td>{gradeLabel(card.grade)}</td>
-                <td><strong>{card.title}</strong>{card.checkFlags.length ? <div className="warn-text small">⚠ {card.checkFlags.length}건 확인</div> : null}</td>
+                <td><strong>{card.title}</strong></td>
                 <td className="small">{card.learningPurpose || <span className="muted">비어 있음</span>}</td>
                 <td>{catName(card.primaryCategory)}</td>
                 <td><StatusBadge st={st} /></td>
-                <td>{card.grade === 0 ? '-' : st.checked ? '✓' : <span className="muted">미확인</span>}</td>
+                <td>{card.grade > 0 && st.checked ? '✓' : ''}</td>
                 <td>{card.changeType ? CHANGE_LABEL[card.changeType] : ''}</td>
                 <td>{st.agreedConnections}/{st.liveConnections}</td>
                 <td className="small muted">{card.updatedByName}</td>

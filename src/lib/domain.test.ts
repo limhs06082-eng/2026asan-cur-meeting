@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildIndex, cardStatus, connectionKey, connectionState, duplicateCandidates, isGradeReviewValid, planClone, validateConnection, verifyClone,
-  checkQuestions, cloneCardId, unresolvedSummary, type ConnectionDraft,
+  checkQuestions, cloneCardId, unresolvedSummary, connectedChain, flows, suggestTopic, type ConnectionDraft,
 } from './domain';
 import { buildSeedCards, seedFile } from '../seed/buildSeed';
 import type { Approval, Card, Connection, Review } from './types';
@@ -58,9 +58,8 @@ describe('연결 검증 (A04)', () => {
   const base = (p: Partial<ConnectionDraft>): ConnectionDraft => ({ type: 'deepen', fromCardId: 'a', toCardId: 'b', topicId: '', reason: '이유', inheritedLearning: '앞', deepenedLearning: '뒤', skipReason: '', rolesByGrade: {}, sharedResult: '', commonGoal: '', gradeScope: '', ...p });
   it('자기 연결 금지', () => expect(validateConnection(base({ toCardId: 'a' }), card('a', 2), card('a', 2)).length).toBeGreaterThan(0));
   it('심화는 깊어지는 배움 필수', () => expect(validateConnection(base({ deepenedLearning: '' }), card('a', 2), card('b', 3)).join()).toContain('깊어지는'));
-  it('학년 건너뛰기는 이유 필수', () => {
-    expect(validateConnection(base({}), card('a', 2), card('b', 5)).join()).toContain('건너뛰는');
-    expect(validateConnection(base({ skipReason: 'x' }), card('a', 2), card('b', 5))).toEqual([]);
+  it('학년을 건너뛰는 연결도 이유 없이 만들 수 있다(드래그 연결 간소화)', () => {
+    expect(validateConnection(base({}), card('a', 2), card('b', 5))).toEqual([]);
   });
   it('공동활동은 참여 학년별 역할과 결과 필수', () => {
     const p = validateConnection(base({ type: 'joint', rolesByGrade: { g2: '배움' } }), card('a', 2), card('b', 6));
@@ -198,5 +197,34 @@ describe('원본 화살표 흐름 질문', () => {
     expect(q1[0].suggest).toEqual({ from: 'a', to: 'b' });
     const q2 = checkQuestions(idxOf({ cards: [a, b], connections: [conn('a', 'b', 1, 2)] })).filter((q) => q.kind === '원본 화살표 흐름');
     expect(q2).toHaveLength(0);
+  });
+});
+
+describe('흐름(1~6학년 줄기)', () => {
+  const cs = [card('a', 1), card('b', 2), card('c', 3), card('d', 5), card('e', 2), card('x', 4, { deletedAt: {} as never })];
+  const links = [
+    conn('a', 'b', 1, 2), conn('b', 'c', 2, 3), conn('c', 'd', 3, 5),
+    conn('a', 'e', 1, 2, { topicId: '생태·환경' }),
+    conn('c', 'x', 3, 4), // 제외된 카드와의 연결은 흐름에서 빠진다
+  ];
+  const idx = idxOf({ cards: cs, connections: links });
+  it('선택한 카드에서 앞뒤 학년으로 이어진 카드를 모두 찾는다', () => {
+    expect([...connectedChain(idx, 'c', '').cardIds].sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect([...connectedChain(idx, 'c', '독서·표현').cardIds].sort()).toEqual(['a', 'b', 'c', 'd']);
+  });
+  it('같은 주제로 이어진 연결이 하나의 흐름이 되고, 빈 학년이 드러난다', () => {
+    const fs = flows(idx, ['독서·표현', '생태·환경']);
+    expect(fs.map((f) => f.topic)).toEqual(['독서·표현', '생태·환경']);
+    expect([...fs[0].byGrade.keys()]).toEqual([1, 2, 3, 5]);
+    expect(fs[0].byGrade.has(4)).toBe(false);
+    expect(fs[0].conns).toHaveLength(3);
+  });
+  it('끊어진 연결은 같은 주제라도 다른 흐름이다', () => {
+    const idx2 = idxOf({ cards: [card('a', 1), card('b', 2), card('c', 4), card('d', 5)], connections: [conn('a', 'b', 1, 2), conn('c', 'd', 4, 5)] });
+    expect(flows(idx2)).toHaveLength(2);
+  });
+  it('새 연결의 주제는 두 카드가 이미 쓰는 주제를 제안한다', () => {
+    expect(suggestTopic(idx, 'd', 'zz')).toBe('독서·표현');
+    expect(suggestTopic(idx, 'zz', 'yy')).toBe('');
   });
 });

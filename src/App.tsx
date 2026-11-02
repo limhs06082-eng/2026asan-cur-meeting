@@ -9,6 +9,7 @@ import { ProfileForm } from './components/Profile';
 import { USE_EMULATOR } from './lib/firebase';
 import { Board } from './views/Board';
 import { ListView, ConnectionsView } from './views/Lists';
+import { FlowsView } from './views/Flows';
 import { Checks } from './views/Checks';
 import { Grades } from './views/Grades';
 import { Output } from './views/Output';
@@ -102,6 +103,7 @@ function Register({ user, onSignIn, onLogout }: { user: User; onSignIn: () => Pr
 
 const VIEWS: Array<{ id: View; label: string; admin?: boolean }> = [
   { id: 'board', label: '전체 보드' },
+  { id: 'flows', label: '흐름' },
   { id: 'list', label: '카드 목록' },
   { id: 'connections', label: '연결' },
   { id: 'grades', label: '학년 정비' },
@@ -121,7 +123,7 @@ function Shell({ onLogout, onSignIn }: { onLogout: () => void; onSignIn: () => P
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const [cardEditor, setCardEditor] = useState<null | { cardId?: string; grade?: number; category?: string; proposalId?: string; key: number }>(null);
-  const [connEditor, setConnEditor] = useState<null | { connectionId?: string; fromCardId?: string; toCardId?: string; key: number }>(null);
+  const [connEditor, setConnEditor] = useState<null | { connectionId?: string; fromCardId?: string; toCardId?: string; quick?: boolean; key: number }>(null);
   const [propEditor, setPropEditor] = useState<null | { targetType: 'card' | 'connection' | 'none'; targetId?: string; grade?: number; kind?: string }>(null);
   const perm = useMemo(() => makePerm(member, y.year), [member, y.year]);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -205,6 +207,7 @@ function Shell({ onLogout, onSignIn }: { onLogout: () => void; onSignIn: () => P
               </div>
             ) : !y.sync.loaded ? <p className="center-screen">자료를 불러오는 중…</p>
             : view === 'board' ? <Board />
+            : view === 'flows' ? <FlowsView />
             : view === 'list' ? <ListView />
             : view === 'connections' ? <ConnectionsView />
             : view === 'grades' ? <Grades />

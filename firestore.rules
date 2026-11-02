@@ -255,11 +255,6 @@ service cloud.firestore {
             && cardOf(ws, y, request.resource.data.toCardId).deletedAt == null
             && cardOf(ws, y, request.resource.data.fromCardId).grade == request.resource.data.fromGrade
             && cardOf(ws, y, request.resource.data.toCardId).grade == request.resource.data.toGrade
-            && (request.resource.data.type != 'deepen'
-                || request.resource.data.toGrade - request.resource.data.fromGrade <= 1
-                && request.resource.data.fromGrade - request.resource.data.toGrade <= 1
-                || request.resource.data.fromGrade == 0 || request.resource.data.toGrade == 0
-                || request.resource.data.skipReason.size() > 0)
             && request.resource.data.createdBy == uid()
             && nowStamped(request.resource.data)
             && pairedEvent(ws, y, 'connections', connId)
