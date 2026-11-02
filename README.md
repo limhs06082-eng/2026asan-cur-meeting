@@ -77,7 +77,7 @@ firebase deploy --only firestore,hosting --project asan-curriculum-link-2026
 ```
 
 - `.env.production`에 웹 설정값이 있습니다. 이 값은 공개되어도 되는 클라이언트 식별값이며, 접근 제어는 Firestore 보안 규칙이 담당합니다. Admin SDK 키·서비스 계정 키는 저장소에 없습니다.
-- 다른 프로젝트로 옮기려면 `.firebaserc`, `.env.production`, `firebase.json`을 바꾸고 Authentication에서 Google 로그인을 켭니다.
+- 다른 서버에 올리거나 새 Firebase 프로젝트로 따로 운영하는 방법은 **`docs/직접-배포하기.md`**에 정리했습니다(바꿀 파일 5곳, 콘솔 설정, 첫날 순서).
 
 ## 5. 데이터 구조
 
