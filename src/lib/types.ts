@@ -25,6 +25,8 @@ export interface Member {
   roles: Role[];
   scopes: Record<string, YearScope>;
   active: boolean;
+  /** 로그인 없이 스스로 이름·담당 학년을 정한 구성원 */
+  selfRegistered?: boolean;
   updatedAt?: Timestamp;
   updatedBy?: string;
 }

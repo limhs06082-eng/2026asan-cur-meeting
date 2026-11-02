@@ -617,6 +617,15 @@ export async function saveMember(actor: Actor, m: Omit<Member, 'updatedAt' | 'up
   });
 }
 
+export type SelfRole = 'teacher' | 'lead' | 'planner' | 'viewer';
+/** 로그인 없이 들어온 선생님이 자기 이름·담당 학년·역할을 정한다(보안 규칙 selfProfile). 관리자가 정한 학년도별 담당은 이 값으로 바뀐다. */
+export async function saveOwnProfile(uid: string, email: string, displayName: string, role: SelfRole, grade: number | null) {
+  const g = grade && grade >= 1 && grade <= 6 ? [grade] : [];
+  const scopes = { any: { edit: role === 'teacher' ? g : [], lead: role === 'lead' ? g : [] } };
+  const roles = role === 'planner' ? ['planner'] : role === 'viewer' ? ['viewer'] : [];
+  await setDoc(memberRef(uid), { uid, email, displayName: displayName.trim(), roles, scopes, active: true, selfRegistered: true, updatedAt: serverTimestamp(), updatedBy: uid });
+}
+
 export async function bootstrapSelfAdmin(uid: string, email: string, displayName: string) {
   // 규칙에 지정된 운영자 계정만 성공한다. 구성원 문서를 먼저 만든 뒤 작업 공간 문서를 만든다.
   await setDoc(memberRef(uid), { uid, email, displayName, roles: ['admin'], scopes: {}, active: true, updatedAt: serverTimestamp(), updatedBy: uid });

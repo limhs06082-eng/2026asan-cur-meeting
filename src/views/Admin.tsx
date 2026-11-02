@@ -118,7 +118,7 @@ function Years() {
         <p className="small">현재 Firebase 무료(Spark) 요금제입니다. 하루 읽기 50,000건·쓰기 20,000건을 넘으면 요금 대신 <strong>다음 초기화 때까지 저장·조회가 막힙니다</strong>. 한도는 미국 태평양 시간 자정, 곧 한국 시각 오후 5시(3~11월 서머타임 기간에는 오후 4시)에 초기화되므로, 전날 오후 5시 이후의 리허설도 같은 날 한도에 들어갑니다. 새로고침이나 새 창 접속 한 번에 현재 작업본 전체(수백 건)를 읽으므로, 노트북 여러 대가 자주 새로고침하면 한도에 닿을 수 있습니다.</p>
         <ul className="small">
           <li>회의 중에는 화면을 새로고침하지 말고 띄워 둔 채 쓰기를 안내해 주세요(바뀐 것만 읽음).</li>
-          <li>노트북을 돌려 쓸 때는 창을 닫지 말고 오른쪽 위 ‘로그아웃’ 뒤 같은 창에서 다음 선생님이 로그인하세요. 30분 안이면 이미 받은 자료를 다시 읽지 않습니다(관리자 계정의 로그아웃은 보안을 위해 전부 비웁니다).</li>
+          <li>노트북을 돌려 쓸 때는 창을 닫지 말고 오른쪽 위 ‘사용자 바꾸기’로 이름·학년만 바꾸도록 안내하세요(자료를 다시 읽지 않음).</li>
           <li>전 교직원 다모임처럼 많이 쓰는 날 전에는 Blaze(종량제) 전환과 예산 알림 설정을 검토하세요. 결제 설정은 운영자가 직접 판단합니다.</li>
           <li>회의 전후 ‘JSON 백업’을 내려받아 학교 드라이브에 보관하세요.</li>
         </ul>
@@ -259,7 +259,7 @@ function Members() {
   return (
     <div>
       <h2>접근 요청 ({pending.length})</h2>
-      <p className="muted small">Google 로그인만으로는 자료를 볼 수 없습니다. 아래 요청을 확인하고 역할과 담당 학년을 정해 승인하세요. 같은 학교 이메일이라고 자동 승인하지 않습니다.</p>
+      <p className="muted small">선생님들은 로그인 없이 이름·학년을 스스로 골라 들어옵니다. 이 목록은 예전 방식의 요청만 보여 줍니다. 구성원 목록에서 특정 접속을 사용 중지할 수 있습니다.</p>
       <table className="simple">
         <thead><tr><th>이름</th><th>이메일</th><th>메모</th><th></th></tr></thead>
         <tbody>{pending.map((r) => <tr key={r.uid}><td>{r.displayName}</td><td>{r.email}</td><td>{r.note}</td><td><button className="btn tiny primary" onClick={() => setEditing({ uid: r.uid, email: r.email, displayName: r.displayName, roles: [], scopes: {}, active: true })}>승인·권한 설정</button></td></tr>)}</tbody>

@@ -340,3 +340,13 @@ tr.removed { opacity: 0.5; }
   .detail-wrap { width: 100%; top: 0; z-index: 50; }
   .sync { margin-left: 0; }
 }
+
+/* 이름·역할 고르기 */
+.register .box.narrow { text-align: left; }
+.profile-form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.profile-form fieldset { border: none; padding: 0; margin: 0; }
+.profile-form legend { font-weight: 600; margin-bottom: 4px; }
+.role-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.role-opt { display: grid; grid-template-columns: auto 1fr; column-gap: 6px; align-items: start; border: 1px solid var(--line); border-radius: 8px; padding: 8px; cursor: pointer; background: #fff; }
+.role-opt input { grid-row: span 2; margin-top: 3px; }
+.role-opt.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }

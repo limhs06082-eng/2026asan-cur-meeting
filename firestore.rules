@@ -26,7 +26,8 @@ service cloud.firestore {
 
     function year(ws, y) { return get(yearPath(ws, y)).data; }
     function yearKey(ws, y) { return 'y' + string(year(ws, y).label); }
-    function scope(ws, y) { return me(ws).get('scopes', {}).get(yearKey(ws, y), {}); }
+    // 학년도별 담당이 없으면 'any'(스스로 고른 담당 학년, 모든 학년도에 적용)를 쓴다
+    function scope(ws, y) { let s = me(ws).get('scopes', {}); return s.get(yearKey(ws, y), s.get('any', {})); }
     function leadGrades(ws, y) { return scope(ws, y).get('lead', []); }
     function editGrades(ws, y) { return scope(ws, y).get('edit', []).concat(leadGrades(ws, y)); }
 
@@ -56,6 +57,22 @@ service cloud.firestore {
     }
 
     function str(v, max) { return v is string && v.size() <= max; }
+
+    // 로그인 없이(익명) 들어온 선생님이 자기 이름·담당 학년·역할을 스스로 정한다(관리자 역할은 불가).
+    // 관리자가 사용 중지(active=false)한 사람은 스스로 다시 켤 수 없고, 관리자 문서는 이 경로로 바꿀 수 없다.
+    function selfProfile(ws, memberId) {
+      let d = request.resource.data;
+      let any = d.scopes.get('any', {});
+      return signedIn() && memberId == uid() && d.uid == uid()
+        && (d.roles == [] || d.roles == ['planner'] || d.roles == ['viewer'])
+        && d.active == true
+        && strReq(d.displayName, 40) && str(d.email, 200)
+        && d.scopes is map && d.scopes.keys().hasOnly(['any'])
+        && any.get('edit', []) is list && any.get('lead', []) is list
+        && any.get('edit', []).size() <= 6 && any.get('lead', []).size() <= 6
+        && d.keys().hasOnly(['uid', 'email', 'displayName', 'roles', 'scopes', 'active', 'updatedAt', 'updatedBy', 'selfRegistered'])
+        && (resource == null || (resource.data.active == true && !('admin' in resource.data.roles)));
+    }
     function strReq(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
 
     // ───────────── 작업 공간 ─────────────
@@ -71,7 +88,8 @@ service cloud.firestore {
         allow create, update: if isAdmin(ws)
           || (signedIn() && memberId == uid()
               && request.auth.token.email == bootstrapEmail() && request.auth.token.email_verified == true
-              && request.resource.data.roles == ['admin'] && request.resource.data.active == true);
+              && request.resource.data.roles == ['admin'] && request.resource.data.active == true)
+          || selfProfile(ws, memberId);
         allow delete: if false;
       }
 

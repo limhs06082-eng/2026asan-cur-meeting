@@ -1,6 +1,6 @@
 // 현재 작업 공간·작업본에 필요한 데이터만 실시간 구독한다(onSnapshot). 화면을 떠나거나 로그아웃하면 구독을 해제한다.
 // 댓글·변경 이력은 여기서 구독하지 않고 상세 화면을 열 때 제한된 범위로 조회한다.
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { collection, onSnapshot, type QuerySnapshot } from 'firebase/firestore';
 import { db, WORKSPACE_ID, DEV_PARAMS } from './firebase';
 import { yearCol, yearRef } from './repo';
@@ -48,6 +48,13 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
   const [data, setData] = useState<Record<CollName, unknown[]>>(() => Object.fromEntries(COLLS.map((c) => [c, []])) as never);
   const [meta, setMeta] = useState<Record<string, { fromCache: boolean; pending: boolean; loaded: boolean }>>({});
   const [error, setError] = useState<string | null>(null);
+  // 구독이 거부·중단되면(권한 반영 지연, 일시적 네트워크 문제) 잠시 뒤 다시 구독한다
+  const [retry, setRetry] = useState(0);
+  const retries = useRef(0);
+  const fail = useCallback((msg: string) => {
+    setError(msg);
+    if (retries.current < 6) { retries.current++; setTimeout(() => setRetry((n) => n + 1), 2000 * retries.current); }
+  }, []);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
 
   useEffect(() => {
@@ -58,11 +65,11 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
 
-  useEffect(() => onSnapshot(collection(db, 'workspaces', WORKSPACE_ID, 'years'), (s) => {
+  useEffect(() => { setError(null); return onSnapshot(collection(db, 'workspaces', WORKSPACE_ID, 'years'), (s) => {
     const list = s.docs.map((d) => ({ id: d.id, ...d.data() }) as YearDoc).filter((y) => includePreparing || y.status !== 'preparing').sort((a, b) => b.label - a.label || b.revision - a.revision || a.id.localeCompare(b.id));
     setYears(list);
     setYearsLoaded(true);
-  }, (e) => setError(e.message)), [includePreparing]);
+  }, (e) => fail(e.message)); }, [includePreparing, retry, fail]);
 
   // 저장된 선택이 없거나 사라졌으면 편집 중인 최신 작업본을 고른다
   useEffect(() => {
@@ -86,17 +93,18 @@ export function YearDataProvider({ children, includePreparing }: { children: Rea
     unsubs.push(onSnapshot(yearRef(yearId), { includeMetadataChanges: true }, (s) => {
       setYear(s.exists() ? ({ id: s.id, ...s.data() } as YearDoc) : null);
       setMeta((m) => ({ ...m, year: { fromCache: s.metadata.fromCache, pending: s.metadata.hasPendingWrites, loaded: true } }));
-    }, (e) => setError(e.message)));
+    }, (e) => fail(e.message)));
     for (const c of COLLS) {
       unsubs.push(onSnapshot(yearCol(yearId, c), { includeMetadataChanges: true }, (s: QuerySnapshot) => {
         if (!s.metadata.hasPendingWrites || s.docChanges().length > 0) {
           setData((d) => ({ ...d, [c]: s.docs.map((x) => ({ id: x.id, ...x.data() })) }));
         }
         setMeta((m) => ({ ...m, [c]: { fromCache: s.metadata.fromCache, pending: s.metadata.hasPendingWrites, loaded: true } }));
-      }, (e) => setError(`${c}: ${e.message}`)));
+        if (!s.metadata.fromCache) retries.current = 0;
+      }, (e) => fail(`${c}: ${e.message}`)));
     }
     return () => unsubs.forEach((u) => u());
-  }, [activeYearId]);
+  }, [activeYearId, retry, fail]);
 
   const value = useMemo<YearData>(() => {
     const cards = data.cards as Card[];

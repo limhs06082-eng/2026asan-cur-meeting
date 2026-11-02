@@ -78,6 +78,19 @@ describe('조회 권한 (A10)', () => {
     await assertFails(updateDoc(doc(as('ed3'), 'workspaces', WS, 'members', 'ed3'), { roles: ['admin'] }));
     await assertFails(setDoc(doc(as('stranger'), 'workspaces', WS, 'members', 'stranger'), { uid: 'stranger', roles: ['admin'], active: true }));
   });
+  it('로그인 없이(익명) 들어온 사람은 스스로 이름·담당 학년을 정해 편집할 수 있다', async () => {
+    const anon = env.authenticatedContext('anon1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+    await assertFails(getDoc(doc(anon, yp('cards', 'c3'))));
+    const prof = { uid: 'anon1', email: '', displayName: '홍길동', roles: [], scopes: { any: { edit: [3], lead: [] } }, active: true, selfRegistered: true };
+    await assertSucceeds(setDoc(doc(anon, 'workspaces', WS, 'members', 'anon1'), prof));
+    await assertSucceeds(getDoc(doc(anon, yp('cards', 'c3'))));
+    await assertSucceeds(editCard(anon, 'anon1', 'c3', { title: '익명 편집' }, 'op-anon-1'));
+    await assertFails(editCard(anon, 'anon1', 'c4', { title: '남의 학년' }, 'op-anon-2'));
+    // 관리자 역할·다른 사람 문서·사용 중지된 사람의 재활성화는 불가
+    await assertFails(setDoc(doc(anon, 'workspaces', WS, 'members', 'anon1'), { ...prof, roles: ['admin'] }));
+    await assertFails(setDoc(doc(anon, 'workspaces', WS, 'members', 'ed3'), { ...prof, uid: 'ed3' }));
+    await assertFails(setDoc(doc(as('inactive'), 'workspaces', WS, 'members', 'inactive'), { ...prof, uid: 'inactive' }));
+  });
   it('지정된 운영자 계정만 최초 관리자 문서를 만들 수 있다', async () => {
     const boot = env.authenticatedContext('bootuid', { email: 'limhs06082@gmail.com', email_verified: true }).firestore();
     await assertSucceeds(setDoc(doc(boot, 'workspaces', WS, 'members', 'bootuid'), { uid: 'bootuid', email: 'limhs06082@gmail.com', displayName: 'b', roles: ['admin'], scopes: {}, active: true }));

@@ -4,9 +4,14 @@ import { connectFirestoreEmulator, initializeFirestore, memoryLocalCache, memory
 
 const env = import.meta.env;
 
+// 관리자 Google 로그인 처리 주소를 앱과 같은 도메인으로 둔다. 다른 도메인(firebaseapp.com)이면 학교망·최신 브라우저의
+// 제3자 저장소 차단 때문에 로그인 후 원래 화면으로 돌아온다. Firebase Hosting은 /__/auth/를 직접 제공하고,
+// Vercel은 vercel.json에서 firebaseapp.com으로 프록시한다.
+const sameOriginAuth = env.VITE_USE_EMULATOR !== '1' && /(\.web\.app|\.firebaseapp\.com|\.vercel\.app)$/.test(location.hostname);
+
 export const firebaseApp = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain: sameOriginAuth ? location.host : env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: env.VITE_FIREBASE_PROJECT_ID,
   appId: env.VITE_FIREBASE_APP_ID,
 });

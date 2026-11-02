@@ -17,7 +17,7 @@ export interface Perm {
 export function makePerm(m: Member, year: YearDoc | null): Perm {
   const isAdmin = m.roles.includes('admin');
   const isPlanner = m.roles.includes('planner');
-  const sc = year ? m.scopes?.[`y${year.label}`] : undefined;
+  const sc = year ? (m.scopes?.[`y${year.label}`] ?? m.scopes?.any) : m.scopes?.any;
   const leadGrades = sc?.lead || [];
   const editGrades = Array.from(new Set([...(sc?.edit || []), ...leadGrades])).sort();
   const editable = year?.status === 'editing';
@@ -33,7 +33,7 @@ export function roleSummary(m: Member, label: number | null): string {
   const parts: string[] = [];
   if (m.roles.includes('admin')) parts.push('관리자');
   if (m.roles.includes('planner')) parts.push('기획팀');
-  const sc = label ? m.scopes?.[`y${label}`] : undefined;
+  const sc = (label ? m.scopes?.[`y${label}`] : undefined) ?? m.scopes?.any;
   if (sc?.lead?.length) parts.push(`${sc.lead.join('·')}학년 대표`);
   const ed = (sc?.edit || []).filter((g) => !(sc?.lead || []).includes(g));
   if (ed.length) parts.push(`${ed.join('·')}학년 편집`);

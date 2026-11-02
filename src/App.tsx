@@ -3,8 +3,9 @@ import { useSession } from './lib/session';
 import { YearDataProvider, useYear } from './lib/data';
 import { AppCtx, defaultFilters, type AppState, type Filters, type View } from './lib/app';
 import { makePerm, roleSummary } from './lib/perm';
-import { bootstrapSelfAdmin, submitAccessRequest, requestRef } from './lib/repo';
-import { onSnapshot } from 'firebase/firestore';
+import { bootstrapSelfAdmin } from './lib/repo';
+import type { User } from 'firebase/auth';
+import { ProfileForm } from './components/Profile';
 import { USE_EMULATOR } from './lib/firebase';
 import { Board } from './views/Board';
 import { ListView, ConnectionsView } from './views/Lists';
@@ -17,32 +18,38 @@ import { CardDetail } from './components/CardDetail';
 import { CardEditor } from './components/CardEditor';
 import { ConnectionEditor, ConnectionDetail } from './components/ConnectionEditor';
 import { ProposalEditor } from './components/Proposals';
-import { GlobalSaveProvider, ToastProvider, useGlobalSave, SAVE_LABEL, hasDirtyForms } from './components/ui';
+import { GlobalSaveProvider, ToastProvider, useGlobalSave, SAVE_LABEL, hasDirtyForms, Modal } from './components/ui';
 
 const BOOTSTRAP_EMAIL = 'limhs06082@gmail.com';
 
 export default function App() {
-  const { state, signIn, logout } = useSession();
-  const [err, setErr] = useState('');
+  const { state, adminSignIn, logout, retry } = useSession();
   if (state.status === 'loading') return <Loading />;
   if (state.status === 'signedOut') {
     return (
-      <div className="center-screen login">
+      <div className="center-screen">
         <h1>아산초 교육과정 연결 협의</h1>
-        <p>선생님들이 학년별 교육활동을 확인하고, 학년 사이의 배움 연결을 함께 협의하는 공간입니다.</p>
-        <button className="btn primary big" onClick={async () => { try { setErr(''); await signIn(); } catch (e) { setErr((e as Error).message); } }}>Google 계정으로 로그인</button>
-        {err ? <p className="warn-text">{err}</p> : null}
-        <p className="muted small">관리자가 승인한 구성원만 자료를 볼 수 있습니다. 학생 개인정보는 입력하지 않습니다.</p>
-        {USE_EMULATOR ? <p className="muted small">개발 모드: 로컬 에뮬레이터에 연결됨</p> : null}
+        <p className="warn-text">서버에 접속하지 못했습니다: {state.error}</p>
+        <button className="btn primary" onClick={retry}>다시 시도</button>
+        <AdminLogin onSignIn={adminSignIn} />
       </div>
     );
   }
-  if (state.status === 'pending') return <Pending email={state.user.email || ''} name={state.user.displayName || ''} uid={state.user.uid} inactive={state.inactive} onLogout={logout} />;
+  if (state.status === 'register') return <Register user={state.user} onSignIn={adminSignIn} onLogout={logout} />;
+  if (state.status === 'inactive') {
+    return (
+      <div className="center-screen">
+        <h1>사용이 중지된 접속입니다</h1>
+        <p>관리자가 이 접속의 편집을 중지했습니다. 필요하면 관리자에게 문의하세요. 남긴 기록은 그대로 보존됩니다.</p>
+        {!state.user.isAnonymous ? <button className="btn ghost" onClick={logout}>로그아웃</button> : null}
+      </div>
+    );
+  }
   return (
     <ToastProvider>
       <GlobalSaveProvider>
         <YearDataProvider includePreparing={state.member.roles.includes('admin')}>
-          <Shell onLogout={logout} />
+          <Shell onLogout={logout} onSignIn={adminSignIn} />
         </YearDataProvider>
       </GlobalSaveProvider>
     </ToastProvider>
@@ -61,35 +68,34 @@ function Loading() {
   );
 }
 
-function Pending({ email, name, uid, inactive, onLogout }: { email: string; name: string; uid: string; inactive: boolean; onLogout: () => void }) {
-  const [note, setNote] = useState('');
-  const [sent, setSent] = useState(false);
-  // 이미 보낸 요청이 있으면 다시 보이지 않게 한다(본인 요청 문서만 읽을 수 있음)
-  useEffect(() => onSnapshot(requestRef(uid), (s) => { if (s.exists()) setSent(true); }, () => {}), [uid]);
+/** 관리자만 Google 계정으로 로그인한다 */
+function AdminLogin({ onSignIn }: { onSignIn: () => Promise<void> }) {
   const [err, setErr] = useState('');
   return (
-    <div className="center-screen">
-      <h1>{inactive ? '접근 권한이 회수되었습니다' : '승인 대기 중'}</h1>
-      {inactive
-        ? <p><strong>{email}</strong> 계정의 접근이 회수되었습니다. 필요하면 관리자에게 문의하세요. 이 계정이 남긴 기록은 그대로 보존됩니다.</p>
-        : <p><strong>{email}</strong> 계정은 아직 작업 공간 구성원이 아닙니다. 관리자에게 승인을 요청하세요.</p>}
-      {!inactive ? (
-        sent ? <p className="info-text">요청을 보냈습니다. 관리자가 승인하면 이 화면이 자동으로 바뀝니다.</p> : (
-          <div className="box narrow">
-            <label className="field"><span>요청 메모(예: 3학년 담임, 학년 대표)</span><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></label>
-            <button className="btn primary" onClick={async () => { try { await submitAccessRequest(uid, email, name || email, note); setSent(true); } catch (e) { setErr((e as Error).message); } }}>접근 요청 보내기</button>
-          </div>
-        )
-      ) : null}
-      {email === BOOTSTRAP_EMAIL && !inactive ? (
+    <p className="muted small">
+      관리자이신가요? <button className="btn tiny ghost" onClick={async () => { try { setErr(''); await onSignIn(); } catch (e) { setErr((e as Error).message); } }}>Google 계정으로 관리자 로그인</button>
+      {err ? <span className="warn-text"> {err}</span> : null}
+    </p>
+  );
+}
+
+/** 처음 들어온 선생님: 로그인 없이 이름·역할·학년만 고른다 */
+function Register({ user, onSignIn, onLogout }: { user: User; onSignIn: () => Promise<void>; onLogout: () => Promise<void> }) {
+  const [err, setErr] = useState('');
+  return (
+    <div className="center-screen register">
+      <h1>아산초 교육과정 연결 협의</h1>
+      <p>학년별 교육활동을 확인하고 학년 사이의 배움 연결을 함께 협의하는 공간입니다. 이름과 학년을 고르면 바로 들어갑니다.</p>
+      <div className="box narrow"><ProfileForm uid={user.uid} email={user.email || ''} member={null} /></div>
+      {user.email === BOOTSTRAP_EMAIL ? (
         <div className="box narrow">
           <p className="small">이 계정은 보안 규칙에 지정된 최초 관리자 계정입니다.</p>
-          <button className="btn" onClick={async () => { try { await bootstrapSelfAdmin(uid, email, name || email); } catch (e) { setErr((e as Error).message); } }}>최초 관리자로 등록</button>
+          <button className="btn" onClick={async () => { try { await bootstrapSelfAdmin(user.uid, user.email || '', user.displayName || user.email || ''); } catch (e) { setErr((e as Error).message); } }}>최초 관리자로 등록</button>
+          {err ? <p className="warn-text">{err}</p> : null}
         </div>
       ) : null}
-      {err ? <p className="warn-text">{err}</p> : null}
-      <p className="muted small">계정 ID: <code>{uid}</code></p>
-      <button className="btn ghost" onClick={onLogout}>로그아웃</button>
+      {user.isAnonymous ? <AdminLogin onSignIn={onSignIn} /> : <button className="btn tiny ghost" onClick={onLogout}>로그아웃</button>}
+      {USE_EMULATOR ? <p className="muted small">개발 모드: 로컬 에뮬레이터에 연결됨</p> : null}
     </div>
   );
 }
@@ -105,7 +111,7 @@ const VIEWS: Array<{ id: View; label: string; admin?: boolean }> = [
   { id: 'guide', label: '사용 안내' },
 ];
 
-function Shell({ onLogout }: { onLogout: () => void }) {
+function Shell({ onLogout, onSignIn }: { onLogout: () => void; onSignIn: () => Promise<void> }) {
   const { state } = useSession();
   const member = state.status === 'member' ? state.member : null!;
   const y = useYear();
@@ -118,6 +124,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const [connEditor, setConnEditor] = useState<null | { connectionId?: string; fromCardId?: string; toCardId?: string; key: number }>(null);
   const [propEditor, setPropEditor] = useState<null | { targetType: 'card' | 'connection' | 'none'; targetId?: string; grade?: number; kind?: string }>(null);
   const perm = useMemo(() => makePerm(member, y.year), [member, y.year]);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const isAnon = state.status === 'member' && state.user.isAnonymous;
   const newVersion = useNewVersion();
   const actor = useMemo(() => ({ uid: member.uid, name: member.displayName || member.email, isAdmin: perm.isAdmin }), [member, perm.isAdmin]);
 
@@ -174,7 +182,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           <div className="me">
             <span title={member.email}>{member.displayName}</span>
             <span className="muted small">{roleSummary(member, y.year?.label ?? null)}</span>
-            <button className="btn tiny ghost" onClick={() => { if (!hasDirtyForms() || window.confirm('저장하지 않은 내용이 있습니다. 로그아웃할까요?')) onLogout(); }}>로그아웃</button>
+            {perm.isAdmin || !isAnon
+              ? <button className="btn tiny ghost" onClick={() => { if (!hasDirtyForms() || window.confirm('저장하지 않은 내용이 있습니다. 로그아웃할까요?')) onLogout(); }}>로그아웃</button>
+              : <button className="btn tiny" onClick={() => { if (!hasDirtyForms() || window.confirm('저장하지 않은 내용이 있습니다. 사용자를 바꿀까요?')) setProfileOpen(true); }} title="노트북을 넘겨받았거나 학년·역할이 바뀌었을 때">사용자 바꾸기</button>}
           </div>
         </header>
         {newVersion ? <div className="year-banner preparing no-print">새 버전이 배포되었습니다. 작성 중인 내용을 저장한 뒤 새로고침(F5)해 주세요.</div> : null}
@@ -208,6 +218,13 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       {cardEditor ? <CardEditor {...cardEditor} key={cardEditor.key} onClose={() => setCardEditor(null)} /> : null}
       {connEditor ? <ConnectionEditor {...connEditor} key={connEditor.key} onClose={() => setConnEditor(null)} /> : null}
       {propEditor ? <ProposalEditor {...propEditor} onClose={() => setPropEditor(null)} /> : null}
+      {profileOpen ? (
+        <Modal title="사용자 바꾸기" onClose={() => setProfileOpen(false)}>
+          <p className="small">노트북을 넘겨받았다면 내 이름과 학년을 고르세요. 이후 저장·확인은 이 이름으로 기록됩니다.</p>
+          <ProfileForm uid={member.uid} email={member.email} member={member} onDone={() => setProfileOpen(false)} onCancel={() => setProfileOpen(false)} />
+          <AdminLogin onSignIn={onSignIn} />
+        </Modal>
+      ) : null}
       {selConn ? <ConnectionDetail conn={selConn} onClose={() => setSelectedConnectionId(null)} /> : null}
     </AppCtx.Provider>
   );
