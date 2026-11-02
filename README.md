@@ -3,6 +3,7 @@
 선생님들이 2026 학년별 교육활동을 직접 확인하고, 1~6학년 사이의 배움 연결과 독립 운영 이유를 함께 기록·합의하여 2027 교육활동 한눈에 보기를 만드는 실시간 공동 작업 웹앱입니다. PRD: `../2026-11-01-교육과정연결웹앱-PRD.md`
 
 - 운영 주소: **https://asan-curriculum-link-2026.web.app**
+- 보조 주소(Vercel): https://2026asan-cur-meeting.vercel.app — GitHub 비공개 저장소 `limhs06082-eng/2026asan-cur-meeting`의 `master`에 푸시하면 자동 배포. 같은 Firebase 프로젝트·같은 자료를 씁니다. Google 로그인을 쓰려면 Firebase 콘솔 → Authentication → 설정 → 승인된 도메인에 `2026asan-cur-meeting.vercel.app`을 추가해야 합니다. 일부 학교·기관 네트워크는 `*.vercel.app`을 차단하므로 현장에서는 Firebase 주소를 기본으로 쓰세요.
 - Firebase 프로젝트: `asan-curriculum-link-2026` (Spark 무료 요금제, 결제 미설정, Firestore 위치 `asia-northeast3` 서울)
 - 기술: React 18 + TypeScript + Vite 5, Firebase JS SDK 12.19 (Authentication·Cloud Firestore·Hosting)
 
